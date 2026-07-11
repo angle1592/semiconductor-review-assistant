@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "semiconductor-review-backend"
+version = "0.1.0"
+description = "Local-first semiconductor after-class review assistant"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "sqlmodel>=0.0.24,<1",
+  "pydantic-settings>=2.8,<3",
+  "python-multipart>=0.0.20,<1",
+  "PyMuPDF>=1.25,<2",
+  "pywin32>=308; platform_system == 'Windows'",
+  "httpx>=0.28,<1",
+  "keyring>=25.6,<26",
+]
+
+[project.optional-dependencies]
+codex = ["openai-codex==0.1.0b3"]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+  "pytest-cov>=6,<7",
+  "ruff>=0.9,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -p no:cacheprovider"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

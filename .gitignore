@@ -2,6 +2,8 @@
 .venv/
 __pycache__/
 .pytest_cache/
+.pytest-*/
+.reviewer-pytest-*/
 .ruff_cache/
 *.py[cod]
 *.db
@@ -13,5 +15,10 @@ frontend/.env
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+frontend/.playwright/
+*.tsbuildinfo
+frontend/vite.config.d.mts
 *.log
 
