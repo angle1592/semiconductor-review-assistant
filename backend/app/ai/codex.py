@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import importlib
+import inspect
 import json
 from contextlib import suppress
 from pathlib import Path
@@ -71,10 +72,13 @@ class CodexProvider:
             sdk = self._sdk()
 
             async def probe():
-                async with sdk.AsyncCodex() as codex:
+                codex = sdk.AsyncCodex()
+                try:
                     account = await codex.account()
                     models = await codex.models(include_hidden=True)
                     return account, models
+                finally:
+                    await _close_codex(codex, self.timeout_seconds)
 
             account, models = await asyncio.wait_for(probe(), timeout=self.timeout_seconds)
             if getattr(account, "account", account) is None:
@@ -156,9 +160,7 @@ class CodexProvider:
         )
         return await self._validated_run(prompt, AnswerAssessment, [])
 
-    async def _validated_run(
-        self, prompt: str, output_type: type[T], image_paths: list[Path]
-    ) -> T:
+    async def _validated_run(self, prompt: str, output_type: type[T], image_paths: list[Path]) -> T:
         raw = await self._run_once(prompt, output_type, image_paths)
         try:
             return output_type.model_validate_json(raw)
@@ -190,8 +192,13 @@ class CodexProvider:
                 "computer_use": False,
             },
         }
+        codex = None
+        turn = None
         try:
-            async with sdk.AsyncCodex() as codex:
+            codex = sdk.AsyncCodex()
+
+            async def execute_turn():
+                nonlocal turn
                 thread = await codex.thread_start(
                     model=self.model or None,
                     cwd=str(self.workspace),
@@ -210,20 +217,37 @@ class CodexProvider:
                     sandbox=sdk.Sandbox.read_only,
                     output_schema=output_type.model_json_schema(),
                 )
-                try:
-                    result = await asyncio.wait_for(turn.run(), timeout=self.timeout_seconds)
-                except asyncio.TimeoutError as error:
+                return await turn.run()
+
+            try:
+                result = await asyncio.wait_for(execute_turn(), timeout=self.timeout_seconds)
+            except asyncio.TimeoutError as error:
+                if turn is not None:
+                    interrupt_timeout = min(2.0, max(0.05, self.timeout_seconds))
                     with suppress(Exception):
-                        interrupt_timeout = min(2.0, max(0.05, self.timeout_seconds))
                         await asyncio.wait_for(turn.interrupt(), timeout=interrupt_timeout)
-                    raise UpstreamTimeoutError() from error
+                raise UpstreamTimeoutError() from error
         except AIProviderError:
             raise
         except Exception as error:
             raise UpstreamProviderError("Codex generation failed.") from error
+        finally:
+            if codex is not None:
+                await _close_codex(codex, self.timeout_seconds)
         if not isinstance(result.final_response, str):
             raise InvalidModelOutputError()
         return result.final_response
+
+
+async def _close_codex(codex, timeout_seconds: float) -> None:
+    close = getattr(codex, "close", None)
+    if close is None:
+        return
+    with suppress(Exception):
+        result = close()
+        if inspect.isawaitable(result):
+            close_timeout = min(2.0, max(0.05, timeout_seconds))
+            await asyncio.wait_for(result, timeout=close_timeout)
 
 
 def _model_exists(response, model: str) -> bool:
@@ -238,6 +262,5 @@ def _model_exists(response, model: str) -> bool:
 
 
 _TEST_IMAGE_BASE64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42Y"
-    "AAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )

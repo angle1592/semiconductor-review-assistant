@@ -234,7 +234,10 @@ async def test_codex_timeout_does_not_hang_when_interrupt_stalls(tmp_path: Path)
             return self
 
         async def __aexit__(self, *_args):
-            return None
+            await asyncio.sleep(10)
+
+        async def close(self):
+            await asyncio.sleep(10)
 
         async def thread_start(self, **_kwargs):
             return Thread()
@@ -250,6 +253,60 @@ async def test_codex_timeout_does_not_hang_when_interrupt_stalls(tmp_path: Path)
 
     provider = CodexProvider(
         model="",
+        data_dir=tmp_path,
+        vision_enabled=False,
+        timeout_seconds=0.01,
+        sdk_loader=lambda: SDK,
+    )
+
+    with pytest.raises(UpstreamTimeoutError):
+        await asyncio.wait_for(
+            provider.generate_learning_items(
+                LearningGenerationRequest(
+                    pages=[LearningSourcePage(source_ref="probe", page_number=1)],
+                    item_count=1,
+                )
+            ),
+            timeout=0.3,
+        )
+
+
+@pytest.mark.asyncio
+async def test_codex_timeout_covers_thread_start(tmp_path: Path) -> None:
+    import asyncio
+
+    class ApprovalMode:
+        deny_all = "deny_all"
+
+    class Sandbox:
+        read_only = "read_only"
+
+    class TextInput:
+        def __init__(self, text):
+            self.text = text
+
+    class LocalImageInput:
+        def __init__(self, path):
+            self.path = path
+
+    class AsyncCodex:
+        async def thread_start(self, **_kwargs):
+            await asyncio.sleep(10)
+
+        async def close(self):
+            return None
+
+    class SDK:
+        pass
+
+    SDK.AsyncCodex = AsyncCodex
+    SDK.ApprovalMode = ApprovalMode
+    SDK.Sandbox = Sandbox
+    SDK.TextInput = TextInput
+    SDK.LocalImageInput = LocalImageInput
+
+    provider = CodexProvider(
+        model="gpt-codex",
         data_dir=tmp_path,
         vision_enabled=False,
         timeout_seconds=0.01,
