@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, BookOpenText, FileText, Plus, Upload } from 'lucide-react'
+import { ArrowLeft, BookOpenText, FileText, Plus, Trash2, Upload } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 
 import { api, previewUrl, type CourseDocument } from '../api/client'
@@ -31,6 +31,14 @@ export function CourseDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ['documents', id] })
     },
   })
+  const removeDocument = useMutation({
+    mutationFn: (document: CourseDocument) => api.deleteDocument(document.id),
+    onSuccess: (_result, document) => {
+      if (uploadedDocument?.id === document.id) setUploadedDocument(null)
+      setNotice(`已删除 ${document.original_filename}。`)
+      void queryClient.invalidateQueries({ queryKey: ['documents', id] })
+    },
+  })
   const notebook = useMutation({
     mutationFn: () =>
       api.importNotebook(id, {
@@ -54,6 +62,13 @@ export function CourseDetailPage() {
     setNotebookText(await file.text())
     setSourceFilename(file.name)
     setNotebookTitle(file.name.replace(/\.(md|txt)$/i, '') || 'NotebookLM 导入')
+  }
+
+  function confirmDocumentDeletion(document: CourseDocument) {
+    const confirmed = window.confirm(
+      `永久删除“${document.original_filename}”及其原文件和页面预览？已生成的复习记录会保留，但来源页面将无法再查看。`,
+    )
+    if (confirmed) removeDocument.mutate(document)
   }
 
   if (course.isPending) return <LoadingState label="正在打开课程档案" />
@@ -142,6 +157,9 @@ export function CourseDetailPage() {
         {documents.isError && !uploadedDocument && (
           <div className="notice">课件索引接口尚未就绪；新上传的课件仍会立即显示在这里。</div>
         )}
+        {removeDocument.isError && (
+          <div className="notice notice--error" role="alert">课件删除失败，请确认本地服务正在运行后重试。</div>
+        )}
         {!documents.isPending && visibleDocuments.length === 0 && (
           <div className="document-empty"><FileText aria-hidden="true" /><p>导入第一份课件后，可逐页预览并记录当天范围。</p></div>
         )}
@@ -153,7 +171,19 @@ export function CourseDetailPage() {
                 <h3>{document.original_filename}</h3>
                 <p>{document.page_count} 页 · 已保留页面来源</p>
               </div>
-              <Link className="button button--secondary" to={`/lessons/new?course=${id}&document=${document.id}`}>选择当天页面</Link>
+              <div className="document-actions">
+                <Link className="button button--secondary" to={`/lessons/new?course=${id}&document=${document.id}`}>选择当天页面</Link>
+                <button
+                  className="button button--danger"
+                  type="button"
+                  aria-label={`删除课件 ${document.original_filename}`}
+                  disabled={removeDocument.isPending && removeDocument.variables?.id === document.id}
+                  onClick={() => confirmDocumentDeletion(document)}
+                >
+                  <Trash2 aria-hidden="true" />
+                  {removeDocument.isPending && removeDocument.variables?.id === document.id ? '正在删除…' : '删除课件'}
+                </button>
+              </div>
             </div>
             {document.pages.length > 0 && (
               <div className="page-strip">

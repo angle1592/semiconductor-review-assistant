@@ -105,6 +105,8 @@ p { color: var(--muted); line-height: 1.65; }
 .button--primary:hover:not(:disabled) { background: var(--orange-dark); border-color: var(--orange-dark); }
 .button--secondary { border-color: var(--line-strong); background: var(--surface); }
 .button--secondary:hover:not(:disabled) { border-color: var(--graphite); }
+.button--danger { border-color: #d9aaa2; color: var(--danger); background: var(--surface); }
+.button--danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger-soft); }
 .button--ghost { border-color: transparent; background: transparent; color: var(--muted); }
 .button--large { min-height: 52px; padding-inline: 24px; }
 .text-link, .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--orange-dark); font-weight: 650; text-decoration: none; }
@@ -201,6 +203,7 @@ label small { color: var(--muted); font-size: 11px; font-weight: 400; }
 .document-meta { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 22px; }
 .document-meta h3 { display: inline; margin-left: 10px; }
 .document-meta p { margin: 6px 0 0; font-size: 12px; }
+.document-actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .file-type { padding: 3px 6px; color: var(--orange-dark); background: var(--orange-soft); font-family: Bahnschrift, sans-serif; font-size: 10px; font-weight: 700; }
 .page-strip { display: flex; gap: 10px; overflow-x: auto; padding: 16px 20px 19px; border-top: 1px solid var(--line); background: var(--paper-cool); }
 .page-strip figure { width: 98px; flex: 0 0 98px; margin: 0; }
@@ -338,6 +341,7 @@ label small { color: var(--muted); font-size: 11px; font-weight: 400; }
   .app-main { padding-inline: 16px; }
   h1 { font-size: 34px; }
   .page-heading, .dashboard-hero, .document-meta, .lesson-submit { align-items: stretch; flex-direction: column; }
+  .document-actions { flex-direction: column; }
   .page-actions .button { width: 100%; }
   .hero-target { display: none; }
   .dashboard-grid, .course-grid, .ingest-grid, .progress-metrics, .rule-grid, .backup-grid, .form-grid { grid-template-columns: 1fr; }

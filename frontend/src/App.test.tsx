@@ -80,6 +80,66 @@ describe('application shell', () => {
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument()
   })
 
+  it('permanently deletes an imported document after confirmation', async () => {
+    const user = userEvent.setup()
+    let deleted = false
+    const fetchMock = vi.fn().mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith('/api/courses/course-1')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ id: 'course-1', title: '晶圆制造', description: '' }),
+          }
+        }
+        if (url.endsWith('/api/courses/course-1/documents')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () =>
+              deleted
+                ? []
+                : [
+                    {
+                      id: 'document-1',
+                      course_id: 'course-1',
+                      title: '测试课件',
+                      original_filename: '测试课件.pdf',
+                      file_type: 'pdf',
+                      page_count: 2,
+                      created_at: '2026-07-11T12:00:00Z',
+                      pages: [],
+                    },
+                  ],
+          }
+        }
+        if (url.endsWith('/api/documents/document-1') && init?.method === 'DELETE') {
+          deleted = true
+          return { ok: true, status: 204 }
+        }
+        throw new Error(`Unexpected request: ${url}`)
+      },
+    )
+    const confirm = vi.fn(() => true)
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('confirm', confirm)
+
+    render(
+      <MemoryRouter initialEntries={['/courses/course-1']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    await user.click(
+      await screen.findByRole('button', { name: '删除课件 测试课件.pdf' }),
+    )
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('复习记录会保留'))
+    expect(await screen.findByText('已删除 测试课件.pdf。')).toBeInTheDocument()
+    expect(screen.queryByText('测试课件.pdf')).not.toBeInTheDocument()
+  })
+
   it('starts a due review directly from the main navigation', async () => {
     const user = userEvent.setup()
     vi.stubGlobal(

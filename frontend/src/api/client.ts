@@ -206,6 +206,8 @@ export const api = {
       body: form,
     })
   },
+  deleteDocument: (documentId: string) =>
+    request<void>(`/api/documents/${documentId}`, { method: 'DELETE' }),
   importNotebook: (
     courseId: string,
     payload: { title: string; raw_text: string; source_filename?: string },
