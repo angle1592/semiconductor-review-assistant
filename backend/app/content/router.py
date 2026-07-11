@@ -105,9 +105,7 @@ def get_document(document_id: str, session: SessionDependency) -> DocumentRead:
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(
-    document_id: str, request: Request, session: SessionDependency
-) -> Response:
+def delete_document(document_id: str, request: Request, session: SessionDependency) -> Response:
     document = session.get(Document, document_id)
     if document is None:
         raise NotFoundError("Document", document_id)
@@ -134,9 +132,7 @@ def list_course_documents(course_id: str, session: SessionDependency) -> list[Do
     for document in documents:
         pages = list(
             session.exec(
-                select(Page)
-                .where(Page.document_id == document.id)
-                .order_by(Page.page_number)
+                select(Page).where(Page.document_id == document.id).order_by(Page.page_number)
             ).all()
         )
         result.append(_document_response(document, pages))
@@ -144,9 +140,7 @@ def list_course_documents(course_id: str, session: SessionDependency) -> list[Do
 
 
 @router.get("/pages/{page_id}/preview", response_class=FileResponse)
-def get_page_preview(
-    page_id: str, request: Request, session: SessionDependency
-) -> FileResponse:
+def get_page_preview(page_id: str, request: Request, session: SessionDependency) -> FileResponse:
     page = session.get(Page, page_id)
     if page is None:
         raise NotFoundError("Page", page_id)

@@ -25,6 +25,37 @@ test('production app opens, creates a course, and reaches settings', async ({ pa
   await expect(page.getByRole('heading', { name: '当前生成与评分服务' })).toBeVisible()
 })
 
+test('deletes an imported document from the course page', async ({ page, request }) => {
+  const courseResponse = await request.post('/api/courses', {
+    data: { title: `删除测试 ${Date.now()}`, description: '' },
+  })
+  expect(courseResponse.ok()).toBe(true)
+  const course = await courseResponse.json()
+  const pdf = Buffer.from(
+    'JVBERi0xLjcKJcK1wrYKJSBXcml0dGVuIGJ5IE11UERGIDEuMjkuMAoKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvSW5mbzw8L1Byb2R1Y2VyKE11UERGIDEuMjkuMCk+Pj4+CmVuZG9iagoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0NvdW50IDEvS2lkc1s0IDAgUl0+PgplbmRvYmoKCjMgMCBvYmoKPDwvRm9udDw8L2hlbHYgNSAwIFI+Pj4+CmVuZG9iagoKNCAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDIwMCAxMjBdL1JvdGF0ZSAwL1Jlc291cmNlcyAzIDAgUi9QYXJlbnQgMiAwIFIvQ29udGVudHNbNiAwIFJdPj4KZW5kb2JqCgo1IDAgb2JqCjw8L1R5cGUvRm9udC9TdWJ0eXBlL1R5cGUxL0Jhc2VGb250L0hlbHZldGljYS9FbmNvZGluZy9XaW5BbnNpRW5jb2Rpbmc+PgplbmRvYmoKCjYgMCBvYmoKPDwvTGVuZ3RoIDY1Pj4Kc3RyZWFtCgpxCkJUCjEgMCAwIDEgMjAgNzAgVG0KL2hlbHYgMTEgVGYgWzw2NDY1NmM2NTc0NjUyMDZkNjU+XVRKCkVUClEKCmVuZHN0cmVhbQplbmRvYmoKCnhyZWYKMCA3CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDA0MiAwMDAwMCBuIAowMDAwMDAwMTIwIDAwMDAwIG4gCjAwMDAwMDAxNzIgMDAwMDAgbiAKMDAwMDAwMDIxMyAwMDAwMCBuIAowMDAwMDAwMzIwIDAwMDAwIG4gCjAwMDAwMDA0MDkgMDAwMDAgbiAKCnRyYWlsZXIKPDwvU2l6ZSA3L1Jvb3QgMSAwIFIvSURbPEMzQTU2QkMzOTlDMkI0QzJCNzREMjgwMTExQzJCRkMzPjxCQUVDNTdGOEY5RDRBODkwNTE0OEM5MTdFQUE0RUE5MT5dPj4Kc3RhcnR4cmVmCjUyMwolJUVPRgo=',
+    'base64',
+  )
+  const uploadResponse = await request.post(`/api/courses/${course.id}/documents`, {
+    multipart: {
+      file: { name: '待删除课件.pdf', mimeType: 'application/pdf', buffer: pdf },
+    },
+  })
+  expect(uploadResponse.ok()).toBe(true)
+  const document = await uploadResponse.json()
+
+  await page.goto(`/courses/${course.id}`)
+  await expect(page.getByText('待删除课件.pdf')).toBeVisible()
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('复习记录会保留')
+    await dialog.accept()
+  })
+  await page.getByRole('button', { name: '删除课件 待删除课件.pdf' }).click()
+
+  await expect(page.getByText('已删除 待删除课件.pdf。')).toBeVisible()
+  await expect(page.locator('.document-card').getByText('待删除课件.pdf')).toHaveCount(0)
+  expect((await request.get(`/api/documents/${document.id}`)).status()).toBe(404)
+})
+
 test.describe('mobile layout', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
