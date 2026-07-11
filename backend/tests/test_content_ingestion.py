@@ -86,6 +86,49 @@ def test_pdf_upload_extracts_numbered_pages_and_serves_png_previews(tmp_path: Pa
     assert originals[0].read_bytes() == pdf_payload
 
 
+def test_delete_document_removes_files_and_pages_but_keeps_lesson_history(
+    tmp_path: Path,
+) -> None:
+    app = create_app(data_dir=tmp_path)
+
+    with TestClient(app) as client:
+        course_id = _create_course(client)
+        uploaded = client.post(
+            f"/api/courses/{course_id}/documents",
+            files={"file": ("temporary.pdf", _two_page_pdf(), "application/pdf")},
+        ).json()
+        document_id = uploaded["id"]
+        page_id = uploaded["pages"][0]["id"]
+        preview_url = uploaded["pages"][0]["preview_url"]
+        lesson = client.post(
+            "/api/lessons",
+            json={
+                "course_id": course_id,
+                "title": "测试课次",
+                "notes": "",
+                "target_minutes": 10,
+                "page_ids": [page_id],
+                "notebook_import_ids": [],
+            },
+        ).json()
+        processed = tmp_path / "processed" / document_id / "converted.pdf"
+        processed.parent.mkdir(parents=True)
+        processed.write_bytes(b"converted")
+
+        deleted = client.delete(f"/api/documents/{document_id}")
+
+        assert deleted.status_code == 204
+        assert client.get(f"/api/documents/{document_id}").status_code == 404
+        assert client.get(preview_url).status_code == 404
+        kept_lesson = client.get(f"/api/lessons/{lesson['id']}")
+        assert kept_lesson.status_code == 200
+        assert kept_lesson.json()["page_ids"] == [page_id]
+
+    assert not (tmp_path / "uploads" / document_id).exists()
+    assert not (tmp_path / "processed" / document_id).exists()
+    assert not (tmp_path / "previews" / document_id).exists()
+
+
 def test_image_only_pdf_upload_keeps_page_mapping_without_inventing_text(
     tmp_path: Path,
 ) -> None:

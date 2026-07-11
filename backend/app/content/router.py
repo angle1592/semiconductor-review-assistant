@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
@@ -15,7 +15,7 @@ from app.content.models import (
     PageRead,
     PageSourceRead,
 )
-from app.content.service import ingest_document
+from app.content.service import delete_document_files, ingest_document
 from app.courses.models import Course
 from app.shared.database import session_for
 from app.shared.errors import NotFoundError
@@ -102,6 +102,22 @@ def get_document(document_id: str, session: SessionDependency) -> DocumentRead:
         ).all()
     )
     return _document_response(document, pages)
+
+
+@router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(
+    document_id: str, request: Request, session: SessionDependency
+) -> Response:
+    document = session.get(Document, document_id)
+    if document is None:
+        raise NotFoundError("Document", document_id)
+    pages = list(session.exec(select(Page).where(Page.document_id == document_id)).all())
+    delete_document_files(data_dir=request.app.state.data_dir, document_id=document_id)
+    for page in pages:
+        session.delete(page)
+    session.delete(document)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/courses/{course_id}/documents", response_model=list[DocumentRead])

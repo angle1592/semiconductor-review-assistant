@@ -18,6 +18,17 @@ from app.content.models import Document, Page
 SUPPORTED_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 
 
+def delete_document_files(*, data_dir: Path, document_id: str) -> None:
+    root = data_dir.resolve()
+    for bucket in ("uploads", "processed", "previews"):
+        bucket_dir = (root / bucket).resolve()
+        target = (bucket_dir / document_id).resolve()
+        if target.parent != bucket_dir:
+            raise ValueError("Invalid document storage path.")
+        if target.exists():
+            shutil.rmtree(target)
+
+
 def export_powerpoint_to_pdf(source_path: Path, target_path: Path) -> None:
     if platform.system() != "Windows":
         raise PowerPointUnavailableError()
