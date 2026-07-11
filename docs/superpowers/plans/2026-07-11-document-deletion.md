@@ -13,12 +13,12 @@
 ### Task 1: Backend deletion contract
 
 **Files:**
-- Modify: `backend/tests/test_content_api.py`
+- Modify: `backend/tests/test_content_ingestion.py`
 - Modify: `backend/app/content/service.py`
 - Modify: `backend/app/content/router.py`
 
 - [ ] Add an integration test that uploads a PDF, creates a lesson referencing one page, calls `DELETE /api/documents/{id}`, and asserts HTTP 204, document/page removal, directory removal, and lesson preservation.
-- [ ] Run `pytest backend/tests/test_content_api.py -q` and verify the new test fails with HTTP 405.
+- [ ] Run `pytest backend/tests/test_content_ingestion.py -q` and verify the new test fails with HTTP 405.
 - [ ] Add `delete_document_files(data_dir, document_id)` that resolves and removes only `uploads/{id}`, `processed/{id}`, and `previews/{id}`.
 - [ ] Add the DELETE route, delete child `Page` rows before the `Document`, commit, and return HTTP 204.
 - [ ] Re-run the content tests and verify they pass.
@@ -29,7 +29,7 @@
 - Modify: `frontend/src/api/client.ts`
 - Modify: `frontend/src/pages/CourseDetailPage.tsx`
 - Modify: `frontend/src/styles.css`
-- Modify: `frontend/src/pages/CourseDetailPage.test.tsx`
+- Modify: `frontend/src/App.test.tsx`
 
 - [ ] Add a component test that renders an imported document, clicks “删除课件”, accepts confirmation, and expects the API delete method plus document-query invalidation.
 - [ ] Run the focused Vitest test and verify it fails because the control/API method is absent.
