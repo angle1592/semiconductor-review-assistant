@@ -15,6 +15,7 @@ from app.content.models import (
     PageRead,
     PageSourceRead,
 )
+from app.content.deletion import cascade_document_learning_data
 from app.content.service import delete_document_files, ingest_document
 from app.courses.models import Course
 from app.shared.database import session_for
@@ -110,6 +111,7 @@ def delete_document(document_id: str, request: Request, session: SessionDependen
     if document is None:
         raise NotFoundError("Document", document_id)
     pages = list(session.exec(select(Page).where(Page.document_id == document_id)).all())
+    cascade_document_learning_data(session, [page.id for page in pages])
     delete_document_files(data_dir=request.app.state.data_dir, document_id=document_id)
     for page in pages:
         session.delete(page)

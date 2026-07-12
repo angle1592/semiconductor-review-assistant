@@ -66,7 +66,7 @@ export function CourseDetailPage() {
 
   function confirmDocumentDeletion(document: CourseDocument) {
     const confirmed = window.confirm(
-      `永久删除“${document.original_filename}”及其原文件和页面预览？已生成的复习记录会保留，但来源页面将无法再查看。`,
+      `永久删除“${document.original_filename}”及其原文件和页面预览？相关课次、题目、答案和复习记录也会一并删除，此操作无法撤销。`,
     )
     if (confirmed) removeDocument.mutate(document)
   }

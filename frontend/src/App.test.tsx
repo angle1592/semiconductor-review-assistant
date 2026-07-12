@@ -135,7 +135,9 @@ describe('application shell', () => {
       await screen.findByRole('button', { name: '删除课件 测试课件.pdf' }),
     )
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('复习记录会保留'))
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining('相关课次、题目、答案和复习记录也会一并删除'),
+    )
     expect(await screen.findByText('已删除 测试课件.pdf。')).toBeInTheDocument()
     expect(screen.queryByText('测试课件.pdf')).not.toBeInTheDocument()
   })

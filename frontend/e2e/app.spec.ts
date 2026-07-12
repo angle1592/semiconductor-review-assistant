@@ -46,7 +46,7 @@ test('deletes an imported document from the course page', async ({ page, request
   await page.goto(`/courses/${course.id}`)
   await expect(page.getByText('待删除课件.pdf')).toBeVisible()
   page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('复习记录会保留')
+    expect(dialog.message()).toContain('相关课次、题目、答案和复习记录也会一并删除')
     await dialog.accept()
   })
   await page.getByRole('button', { name: '删除课件 待删除课件.pdf' }).click()
