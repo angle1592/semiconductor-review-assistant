@@ -1,9 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$GitleaksPath = '',
-    [string[]]$ForbiddenPatterns = @(
-        'sk-[A-Za-z0-9_-]{20,}'
-    )
+    [string[]]$ForbiddenPatterns = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,7 +16,11 @@ $config = Join-Path $root '.gitleaks.toml'
 $securityRoot = Join-Path $root 'build\security-source'
 $securityArchive = Join-Path $root 'build\security-source.zip'
 $userProfilePattern = [Regex]::Escape([Environment]::GetFolderPath('UserProfile'))
-$effectiveForbiddenPatterns = @($ForbiddenPatterns) + @($userProfilePattern)
+$builtInSecretPatterns = @(
+    'sk-[A-Za-z0-9]{20,}',
+    'sk-(?:proj|svcacct)-[A-Za-z0-9_-]{20,}'
+)
+$effectiveForbiddenPatterns = $builtInSecretPatterns + @($ForbiddenPatterns) + @($userProfilePattern)
 
 function Assert-NativeSuccess([string]$Step) {
     if ($LASTEXITCODE -ne 0) { throw "$Step 失败，退出码：$LASTEXITCODE" }
