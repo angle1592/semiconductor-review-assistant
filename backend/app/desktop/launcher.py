@@ -68,7 +68,9 @@ def launch(
             browser_open(f"{existing.base_url}/")
             return 0
 
-        migrate_database(resolved_paths.data / "review.db", resolved_paths.backups)
+        database_path = resolved_paths.data / "review.db"
+        first_run = not database_path.exists()
+        migrate_database(database_path, resolved_paths.backups)
         app = create_app(
             data_dir=resolved_paths.data,
             frontend_dist_dir=resolved_paths.frontend_dist,
@@ -84,7 +86,7 @@ def launch(
         def open_when_ready() -> None:
             ready = _wait_for_instance(store, validator, wait_timeout)
             if ready is not None:
-                browser_open(f"{ready.base_url}/")
+                browser_open(f"{ready.base_url}/setup" if first_run else f"{ready.base_url}/")
 
         browser_thread = threading.Thread(target=open_when_ready, daemon=True)
         browser_thread.start()

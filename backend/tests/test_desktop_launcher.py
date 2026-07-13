@@ -75,6 +75,6 @@ def test_first_launch_runs_server_and_cleans_runtime_metadata(tmp_path: Path):
 
     assert result == 0
     assert server.ran
-    assert opened == ["http://127.0.0.1:54322/"]
+    assert opened == ["http://127.0.0.1:54322/setup"]
     assert InstanceStore(paths.runtime).read() is None
     assert mutex.closed

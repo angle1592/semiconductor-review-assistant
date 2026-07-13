@@ -145,6 +145,15 @@ export type Dashboard = {
   }>
 }
 
+export type SystemInfo = {
+  application: string
+  version: string
+  packaged: boolean
+  setup_complete: boolean
+  data_directory: string
+  log_directory: string
+}
+
 export class ApiError extends Error {
   status: number
   code?: string
@@ -287,6 +296,11 @@ export const api = {
     form.append('file', file)
     return request<{ restored: boolean }>('/api/backups/restore', { method: 'POST', body: form })
   },
+  getSystemInfo: () => request<SystemInfo>('/api/system/info'),
+  openSystemPath: (kind: 'data' | 'backups' | 'logs') =>
+    request<void>(`/api/system/paths/${kind}/open`, { method: 'POST' }),
+  exportDiagnostics: () => requestBlob('/api/system/diagnostics'),
+  shutdown: () => request<{ status: string }>('/api/system/shutdown', { method: 'POST' }),
 }
 
 function mapReviewSession(raw: RawReviewSession): ReviewSession {
