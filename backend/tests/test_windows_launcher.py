@@ -380,7 +380,9 @@ def test_shortcut_installer_creates_hidden_desktop_launcher(tmp_path: Path):
 
     assert installed.returncode == 0
     assert shortcut_path.exists()
-    env["TEST_SHORTCUT_PATH"] = str(shortcut_path)
+    inspection_path = tmp_path / "shortcut-inspection.lnk"
+    shutil.copyfile(shortcut_path, inspection_path)
+    env["TEST_SHORTCUT_PATH"] = str(inspection_path)
     inspect_command = (
         "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:TEST_SHORTCUT_PATH);"
         "@{TargetPath=$s.TargetPath;Arguments=$s.Arguments;"
