@@ -2,6 +2,8 @@
 
 一个本地优先的课后复习助手：导入培训课件，选择当天页面，用 10～15 分钟完成主动回忆、纠错、自评和间隔复习。
 
+普通使用者请从 GitHub Release 下载 Windows 安装包，无需安装 Python 或 Node。下面的 PowerShell 方式只用于源码开发。
+
 ## Windows 快速开始
 
 首次运行：
@@ -63,6 +65,13 @@ npm run test:e2e
 ```
 
 浏览器端到端测试默认使用本机已安装的 Google Chrome，不额外下载浏览器。
+
+构建 Windows 独立应用：
+
+```powershell
+.\scripts\build-windows.ps1
+.\scripts\verify-frozen-app.ps1
+```
 
 ## 第一版边界
 
