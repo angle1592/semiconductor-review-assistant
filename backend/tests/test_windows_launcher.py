@@ -54,6 +54,8 @@ def _run_script(script: str, *arguments: str, env: dict[str, str]) -> subprocess
         )
         output.seek(0)
         captured = output.read()
+    if completed.returncode != 0:
+        print(captured.decode(errors="replace"), file=sys.stderr)
     return subprocess.CompletedProcess(
         completed.args,
         completed.returncode,
