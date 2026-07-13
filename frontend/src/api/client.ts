@@ -195,6 +195,8 @@ export const api = {
   getCourse: (courseId: string) => request<Course>(`/api/courses/${courseId}`),
   createCourse: (payload: Pick<Course, 'title' | 'description'>) =>
     request<Course>('/api/courses', { method: 'POST', body: json(payload) }),
+  deleteCourse: (courseId: string) =>
+    request<void>(`/api/courses/${courseId}`, { method: 'DELETE' }),
   listDocuments: (courseId: string) =>
     request<CourseDocument[]>(`/api/courses/${courseId}/documents`),
   getDocument: (documentId: string) => request<CourseDocument>(`/api/documents/${documentId}`),

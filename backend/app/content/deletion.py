@@ -2,6 +2,8 @@ import json
 
 from sqlmodel import Session, select
 
+from app.content.models import Document, NotebookImport, Page
+from app.courses.models import Course
 from app.learning.models import Attempt, KnowledgePoint, Lesson, Question, ReviewSession
 
 
@@ -9,12 +11,7 @@ def _load_ids(value: str) -> list[str]:
     return [str(item) for item in json.loads(value)]
 
 
-def cascade_document_learning_data(session: Session, page_ids: list[str]) -> None:
-    affected_pages = set(page_ids)
-    lessons = list(session.exec(select(Lesson)).all())
-    affected_lessons = [
-        lesson for lesson in lessons if affected_pages.intersection(_load_ids(lesson.page_ids_json))
-    ]
+def _cascade_lessons(session: Session, affected_lessons: list[Lesson]) -> None:
     if not affected_lessons:
         return
 
@@ -64,3 +61,31 @@ def cascade_document_learning_data(session: Session, page_ids: list[str]) -> Non
         session.delete(point)
     for lesson in affected_lessons:
         session.delete(lesson)
+
+
+def cascade_document_learning_data(session: Session, page_ids: list[str]) -> None:
+    affected_pages = set(page_ids)
+    lessons = list(session.exec(select(Lesson)).all())
+    affected_lessons = [
+        lesson for lesson in lessons if affected_pages.intersection(_load_ids(lesson.page_ids_json))
+    ]
+    _cascade_lessons(session, affected_lessons)
+
+
+def cascade_course_data(session: Session, course: Course) -> list[str]:
+    lessons = list(session.exec(select(Lesson).where(Lesson.course_id == course.id)).all())
+    _cascade_lessons(session, lessons)
+
+    documents = list(session.exec(select(Document).where(Document.course_id == course.id)).all())
+    document_ids = [document.id for document in documents]
+    if document_ids:
+        for page in session.exec(select(Page).where(Page.document_id.in_(document_ids))).all():
+            session.delete(page)
+    for notebook in session.exec(
+        select(NotebookImport).where(NotebookImport.course_id == course.id)
+    ).all():
+        session.delete(notebook)
+    for document in documents:
+        session.delete(document)
+    session.delete(course)
+    return document_ids

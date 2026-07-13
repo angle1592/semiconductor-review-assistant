@@ -1,8 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlmodel import Session, select
 
+from app.content.deletion import cascade_course_data
+from app.content.service import delete_document_files
 from app.courses.models import Course, CourseCreate, CourseRead
 from app.shared.database import session_for
 from app.shared.errors import NotFoundError
@@ -38,3 +40,15 @@ def get_course(course_id: str, session: SessionDependency) -> Course:
     if course is None:
         raise NotFoundError("Course", course_id)
     return course
+
+
+@router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_course(course_id: str, request: Request, session: SessionDependency) -> Response:
+    course = session.get(Course, course_id)
+    if course is None:
+        raise NotFoundError("Course", course_id)
+    document_ids = cascade_course_data(session, course)
+    for document_id in document_ids:
+        delete_document_files(data_dir=request.app.state.data_dir, document_id=document_id)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

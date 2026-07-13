@@ -175,8 +175,11 @@ label small { color: var(--muted); font-size: 11px; font-weight: 400; }
 .form-actions { display: flex; align-items: center; gap: 10px; }
 .form-error { grid-column: 1 / -1; margin: 0; color: var(--danger); font-size: 13px; }
 .course-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.course-card { display: grid; grid-template-columns: auto 1fr; min-height: 190px; gap: 18px; padding: 25px; border: 1px solid var(--line); background: var(--surface); text-decoration: none; transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease; }
+.course-card { position: relative; min-height: 190px; border: 1px solid var(--line); background: var(--surface); transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease; }
 .course-card:hover { transform: translateY(-2px); border-color: var(--orange); box-shadow: var(--shadow); }
+.course-card-main { display: grid; min-height: 188px; grid-template-columns: auto 1fr; gap: 18px; padding: 25px 62px 25px 25px; text-decoration: none; }
+.course-card-delete { position: absolute; z-index: 1; top: 13px; right: 13px; color: var(--muted); }
+.course-card-delete:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
 .course-card-icon { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--orange-dark); }
 .course-card h2 { margin-top: 4px; }
 .course-card p { font-size: 13px; }

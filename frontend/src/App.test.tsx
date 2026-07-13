@@ -142,6 +142,52 @@ describe('application shell', () => {
     expect(screen.queryByText('测试课件.pdf')).not.toBeInTheDocument()
   })
 
+  it('permanently deletes a course and its learning history after confirmation', async () => {
+    const user = userEvent.setup()
+    let deleted = false
+    const fetchMock = vi.fn().mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith('/api/courses/course-1') && init?.method === 'DELETE') {
+          deleted = true
+          return { ok: true, status: 204 }
+        }
+        if (url.endsWith('/api/courses') && !init?.method) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () =>
+              deleted
+                ? []
+                : [{ id: 'course-1', title: '测试课程', description: '待删除' }],
+          }
+        }
+        throw new Error(`Unexpected request: ${url}`)
+      },
+    )
+    const confirm = vi.fn(() => true)
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('confirm', confirm)
+
+    render(
+      <MemoryRouter initialEntries={['/courses']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: '删除课程 测试课程' }))
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining('课件、课次、题目、答案和复习记录都会一并删除'),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/courses/course-1'),
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+    expect(await screen.findByText('已删除课程“测试课程”。')).toBeInTheDocument()
+    expect(screen.queryByText('测试课程')).not.toBeInTheDocument()
+  })
+
   it('starts a due review directly from the main navigation', async () => {
     const user = userEvent.setup()
     vi.stubGlobal(

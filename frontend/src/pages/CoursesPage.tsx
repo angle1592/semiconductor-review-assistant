@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, BookMarked, Plus, X } from 'lucide-react'
+import { ArrowRight, BookMarked, Plus, Trash2, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import { api } from '../api/client'
+import { api, type Course } from '../api/client'
 import { EmptyState, ErrorState, LoadingState, PageHeading } from '../components/Ui'
 
 export function CoursesPage() {
@@ -11,6 +11,7 @@ export function CoursesPage() {
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [notice, setNotice] = useState('')
   const courses = useQuery({ queryKey: ['courses'], queryFn: api.listCourses })
   const createCourse = useMutation({
     mutationFn: api.createCourse,
@@ -21,11 +22,32 @@ export function CoursesPage() {
       setShowForm(false)
     },
   })
+  const deleteCourse = useMutation({
+    mutationFn: async (course: Course) => {
+      await api.deleteCourse(course.id)
+      return course
+    },
+    onSuccess: (course) => {
+      queryClient.setQueryData<Course[]>(['courses'], (current = []) =>
+        current.filter((item) => item.id !== course.id),
+      )
+      setNotice(`已删除课程“${course.title}”。`)
+    },
+  })
 
   function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!title.trim()) return
     createCourse.mutate({ title: title.trim(), description: description.trim() })
+  }
+
+  function handleDelete(course: Course) {
+    const confirmed = window.confirm(
+      `确定删除课程“${course.title}”吗？\n\n课程下的课件、课次、题目、答案和复习记录都会一并删除，此操作无法撤销。`,
+    )
+    if (!confirmed) return
+    setNotice('')
+    deleteCourse.mutate(course)
   }
 
   return (
@@ -40,6 +62,13 @@ export function CoursesPage() {
           </button>
         }
       />
+
+      {notice && <div className="notice notice--success" role="status">{notice}</div>}
+      {deleteCourse.isError && (
+        <div className="notice notice--error" role="alert">
+          课程删除失败，请确认本地服务正在运行后重试。
+        </div>
+      )}
 
       {showForm && (
         <section className="inline-form-panel" aria-label="新建课程">
@@ -95,14 +124,25 @@ export function CoursesPage() {
       {courses.data && courses.data.length > 0 && (
         <div className="course-grid">
           {courses.data.map((course) => (
-            <Link className="course-card" to={`/courses/${course.id}`} key={course.id}>
-              <span className="course-card-icon"><BookMarked aria-hidden="true" /></span>
-              <div>
-                <h2>{course.title}</h2>
-                <p>{course.description || '尚未添加课程说明'}</p>
-              </div>
-              <span className="course-card-action">打开档案 <ArrowRight aria-hidden="true" /></span>
-            </Link>
+            <article className="course-card" key={course.id}>
+              <button
+                className="icon-button course-card-delete"
+                type="button"
+                aria-label={`删除课程 ${course.title}`}
+                disabled={deleteCourse.isPending && deleteCourse.variables?.id === course.id}
+                onClick={() => handleDelete(course)}
+              >
+                <Trash2 aria-hidden="true" />
+              </button>
+              <Link className="course-card-main" to={`/courses/${course.id}`}>
+                <span className="course-card-icon"><BookMarked aria-hidden="true" /></span>
+                <div>
+                  <h2>{course.title}</h2>
+                  <p>{course.description || '尚未添加课程说明'}</p>
+                </div>
+                <span className="course-card-action">打开档案 <ArrowRight aria-hidden="true" /></span>
+              </Link>
+            </article>
           ))}
         </div>
       )}

@@ -56,6 +56,27 @@ test('deletes an imported document from the course page', async ({ page, request
   expect((await request.get(`/api/documents/${document.id}`)).status()).toBe(404)
 })
 
+test('deletes a course from the course list', async ({ page, request }) => {
+  const courseTitle = `待删除课程 ${Date.now()}`
+  const courseResponse = await request.post('/api/courses', {
+    data: { title: courseTitle, description: '课程删除链路验证' },
+  })
+  expect(courseResponse.ok()).toBe(true)
+  const course = await courseResponse.json()
+
+  await page.goto('/courses')
+  await expect(page.getByRole('heading', { name: courseTitle })).toBeVisible()
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('课件、课次、题目、答案和复习记录都会一并删除')
+    await dialog.accept()
+  })
+  await page.getByRole('button', { name: `删除课程 ${courseTitle}` }).click()
+
+  await expect(page.getByText(`已删除课程“${courseTitle}”。`)).toBeVisible()
+  await expect(page.getByRole('heading', { name: courseTitle })).toHaveCount(0)
+  expect((await request.get(`/api/courses/${course.id}`)).status()).toBe(404)
+})
+
 test.describe('mobile layout', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 

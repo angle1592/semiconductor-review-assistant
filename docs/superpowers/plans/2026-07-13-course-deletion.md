@@ -17,10 +17,10 @@
 - Modify: `backend/app/content/deletion.py`
 - Modify: `backend/app/courses/router.py`
 
-- [ ] Write an integration test that creates two courses with documents, pages, Notebook imports, lessons, questions, attempts, and a mixed review session.
-- [ ] Run `backend/.venv/Scripts/python.exe -m pytest backend/tests/test_courses_api.py -q` and verify the new test fails with HTTP 405.
-- [ ] Add a course-scoped deletion service and `DELETE /api/courses/{course_id}` returning 204.
-- [ ] Verify the test passes and missing courses return the standard 404 response.
+- [x] Write an integration test that creates two courses with documents, pages, Notebook imports, lessons, questions, attempts, and a mixed review session.
+- [x] Run `backend/.venv/Scripts/python.exe -m pytest backend/tests/test_courses_api.py -q` and verify the new test fails with HTTP 405.
+- [x] Add a course-scoped deletion service and `DELETE /api/courses/{course_id}` returning 204.
+- [x] Verify the test passes and missing courses return the standard 404 response.
 
 ### Task 2: Course-list delete interaction
 
@@ -30,17 +30,16 @@
 - Modify: `frontend/src/pages/CoursesPage.tsx`
 - Modify: `frontend/src/styles.css`
 
-- [ ] Write a UI test that confirms the destructive warning, sends DELETE, removes the course, and shows success feedback.
-- [ ] Run `npm test -- --run src/App.test.tsx` from `frontend` and verify the new test fails because no delete button exists.
-- [ ] Add `api.deleteCourse`, a React Query delete mutation, a separate card delete button, confirmation, and user-facing success/error feedback.
-- [ ] Verify the focused UI test passes.
+- [x] Write a UI test that confirms the destructive warning, sends DELETE, removes the course, and shows success feedback.
+- [x] Run `npm test -- --run src/App.test.tsx` from `frontend` and verify the new test fails because no delete button exists.
+- [x] Add `api.deleteCourse`, a React Query delete mutation, a separate card delete button, confirmation, and user-facing success/error feedback.
+- [x] Verify the focused UI test passes.
 
 ### Task 3: End-to-end verification
 
 **Files:**
 - Modify: `frontend/e2e/app.spec.ts`
 
-- [ ] Add a Playwright flow that creates a disposable course, deletes it from the list, and verifies it disappears.
-- [ ] Run the complete backend tests, Ruff, frontend tests, ESLint, build, and Playwright suite.
-- [ ] Commit the implementation after every verification is green.
-
+- [x] Add a Playwright flow that creates a disposable course, deletes it from the list, and verifies it disappears.
+- [x] Run the complete backend tests, Ruff, frontend tests, ESLint, build, and Playwright suite.
+- [x] Commit the implementation after every verification is green.
