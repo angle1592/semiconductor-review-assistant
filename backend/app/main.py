@@ -83,7 +83,15 @@ def create_app(
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
         started = time.perf_counter()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.info(
+                "request path=%s status=500 duration_ms=%.1f",
+                request.url.path,
+                (time.perf_counter() - started) * 1000,
+            )
+            raise
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"

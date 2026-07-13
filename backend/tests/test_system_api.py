@@ -147,7 +147,7 @@ def test_requests_and_unexpected_error_type_are_logged_without_error_message(
     assert healthy.status_code == 200
     assert failed.status_code == 500
     assert "path=/health status=200" in caplog.text
-    assert "path=/api/test/boom" in caplog.text
+    assert "path=/api/test/boom status=500" in caplog.text
     assert "exception=RuntimeError" in caplog.text
     assert "private-payload-must-not-enter-log" not in caplog.text
 
