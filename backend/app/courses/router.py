@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from sqlmodel import Session, select
 
 from app.content.deletion import cascade_course_data
-from app.content.service import delete_document_files
+from app.content.service import stage_document_files_for_deletion
 from app.courses.models import Course, CourseCreate, CourseRead
 from app.shared.database import session_for
 from app.shared.errors import NotFoundError
@@ -48,7 +48,14 @@ def delete_course(course_id: str, request: Request, session: SessionDependency) 
     if course is None:
         raise NotFoundError("Course", course_id)
     document_ids = cascade_course_data(session, course)
-    for document_id in document_ids:
-        delete_document_files(data_dir=request.app.state.data_dir, document_id=document_id)
-    session.commit()
+    staged_files = stage_document_files_for_deletion(
+        data_dir=request.app.state.data_dir,
+        document_ids=document_ids,
+    )
+    try:
+        session.commit()
+    except Exception:
+        staged_files.restore()
+        raise
+    staged_files.purge()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

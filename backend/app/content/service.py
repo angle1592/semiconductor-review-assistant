@@ -1,5 +1,6 @@
 import platform
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 from uuid import uuid4
@@ -18,6 +19,22 @@ from app.content.models import Document, Page
 SUPPORTED_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 
 
+@dataclass
+class StagedDocumentFiles:
+    staging_dir: Path
+    moves: list[tuple[Path, Path]]
+
+    def restore(self) -> None:
+        for original, staged in reversed(self.moves):
+            if staged.exists():
+                original.parent.mkdir(parents=True, exist_ok=True)
+                staged.replace(original)
+        shutil.rmtree(self.staging_dir, ignore_errors=True)
+
+    def purge(self) -> None:
+        shutil.rmtree(self.staging_dir, ignore_errors=True)
+
+
 def delete_document_files(*, data_dir: Path, document_id: str) -> None:
     root = data_dir.resolve()
     for bucket in ("uploads", "processed", "previews"):
@@ -27,6 +44,33 @@ def delete_document_files(*, data_dir: Path, document_id: str) -> None:
             raise ValueError("Invalid document storage path.")
         if target.exists():
             shutil.rmtree(target)
+
+
+def stage_document_files_for_deletion(
+    *, data_dir: Path, document_ids: list[str]
+) -> StagedDocumentFiles:
+    root = data_dir.resolve()
+    staged_files = StagedDocumentFiles(
+        staging_dir=root / ".trash" / str(uuid4()),
+        moves=[],
+    )
+    try:
+        for document_id in document_ids:
+            for bucket in ("uploads", "processed", "previews"):
+                bucket_dir = (root / bucket).resolve()
+                original = (bucket_dir / document_id).resolve()
+                if original.parent != bucket_dir:
+                    raise ValueError("Invalid document storage path.")
+                if not original.exists():
+                    continue
+                staged = staged_files.staging_dir / bucket / document_id
+                staged.parent.mkdir(parents=True, exist_ok=True)
+                original.replace(staged)
+                staged_files.moves.append((original, staged))
+    except Exception:
+        staged_files.restore()
+        raise
+    return staged_files
 
 
 def export_powerpoint_to_pdf(source_path: Path, target_path: Path) -> None:

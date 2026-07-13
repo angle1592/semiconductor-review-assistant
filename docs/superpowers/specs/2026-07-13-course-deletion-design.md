@@ -24,10 +24,11 @@ Allow the learner to permanently delete an unwanted course from the course list,
 
 Review sessions containing questions from multiple courses keep unrelated questions and attempts. If a review session becomes empty, it is deleted. Database changes are committed once after the complete cascade is prepared.
 
+Before that commit, owned document directories are moved into a local staging area. A database failure restores them to their original paths; after a successful commit, the staged files are purged. This prevents a failed delete from leaving the database pointed at missing courseware.
+
 ## Testing
 
 - Backend integration tests create two courses and mixed review data, delete one course, and verify all owned data is gone while unrelated data remains.
 - API tests verify a missing course returns the standard 404 problem response.
 - Frontend tests verify confirmation copy, DELETE request, list removal, cancellation, and failure behavior.
 - Playwright covers deleting a course from the visible course list.
-

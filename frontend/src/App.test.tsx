@@ -188,6 +188,65 @@ describe('application shell', () => {
     expect(screen.queryByText('测试课程')).not.toBeInTheDocument()
   })
 
+  it('keeps a course when deletion is cancelled', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [{ id: 'course-1', title: '保留课程', description: '' }],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('confirm', vi.fn(() => false))
+
+    render(
+      <MemoryRouter initialEntries={['/courses']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: '删除课程 保留课程' }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('heading', { name: '保留课程' })).toBeInTheDocument()
+  })
+
+  it('keeps a course and shows a safe error when deletion fails', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn().mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith('/api/courses/course-1') && init?.method === 'DELETE') {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ detail: 'internal database details' }),
+          }
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [{ id: 'course-1', title: '删除失败课程', description: '' }],
+        }
+      },
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('confirm', vi.fn(() => true))
+
+    render(
+      <MemoryRouter initialEntries={['/courses']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: '删除课程 删除失败课程' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '课程删除失败，请确认本地服务正在运行后重试。',
+    )
+    expect(screen.queryByText('internal database details')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '删除失败课程' })).toBeInTheDocument()
+  })
+
   it('starts a due review directly from the main navigation', async () => {
     const user = userEvent.setup()
     vi.stubGlobal(

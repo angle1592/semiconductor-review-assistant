@@ -214,3 +214,36 @@ def test_delete_missing_course_uses_consistent_not_found_error(tmp_path):
 
     assert response.status_code == 404
     assert response.json()["code"] == "NOT_FOUND"
+
+
+def test_delete_course_restores_files_when_database_commit_fails(tmp_path, monkeypatch):
+    app = create_app(data_dir=tmp_path)
+    with Session(app.state.database) as session:
+        course = Course(title="提交失败测试")
+        session.add(course)
+        session.flush()
+        document = Document(
+            course_id=course.id,
+            title="必须恢复的课件",
+            original_filename="restore.pdf",
+            file_type="pdf",
+            original_path="uploads/restore.pdf",
+        )
+        session.add(document)
+        session.commit()
+        course_id = course.id
+        document_id = document.id
+
+    artifact = tmp_path / "uploads" / document_id / "restore.pdf"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_bytes(b"must survive")
+
+    def fail_commit(_session):
+        raise RuntimeError("simulated sqlite failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.delete(f"/api/courses/{course_id}")
+
+    assert response.status_code == 500
+    assert artifact.read_bytes() == b"must survive"
