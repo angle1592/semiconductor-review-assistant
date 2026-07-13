@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,6 +19,8 @@ from app.learning.router import router as learning_router
 from app.shared.database import create_database
 from app.shared.errors import AppError, app_error_handler, unexpected_error_handler
 from app.shared.request_id import RequestIdMiddleware
+from app.runtime.migrations import migrate_database
+from app.runtime.paths import AppPaths
 
 
 def create_app(
@@ -116,7 +117,9 @@ def create_app(
 
 
 def create_default_app() -> FastAPI:
-    project_root = Path(__file__).resolve().parents[2]
-    data_dir = Path(os.getenv("SEMIREVIEW_DATA_DIR", project_root / "data"))
-    frontend_dir = Path(os.getenv("SEMIREVIEW_FRONTEND_DIST", project_root / "frontend" / "dist"))
-    return create_app(data_dir=data_dir, frontend_dist_dir=frontend_dir)
+    paths = AppPaths.discover()
+    paths.ensure_directories()
+    migrate_database(paths.data / "review.db", paths.backups)
+    app = create_app(data_dir=paths.data, frontend_dist_dir=paths.frontend_dist)
+    app.state.paths = paths
+    return app
