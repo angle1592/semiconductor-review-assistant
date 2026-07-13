@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Clearly fake test-only API values"
+paths = [
+  '''backend/tests/test_ai_settings_api\.py''',
+  '''backend/tests/test_openai_compatible_provider\.py''',
+  '''frontend/src/pages/SetupPage\.test\.tsx''',
+]
+regexes = [
+  '''super-secret-api-key''',
+  '''temporary-key''',
+  '''private-test-key''',
+]
