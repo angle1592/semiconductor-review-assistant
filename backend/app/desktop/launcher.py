@@ -141,8 +141,14 @@ def launch(
 
 def shutdown_existing(paths: AppPaths | None = None) -> int:
     resolved_paths = paths or AppPaths.discover()
-    metadata = InstanceStore(resolved_paths.runtime).read()
-    if metadata is None or not validate_instance(metadata):
+    store = InstanceStore(resolved_paths.runtime)
+    metadata = store.read()
+    if metadata is None:
+        return 0
+    if not validate_instance(metadata):
+        if process_is_running(metadata.pid):
+            return 1
+        store.remove_if_owned_by(metadata.pid)
         return 0
     try:
         request = Request(f"{metadata.base_url}/api/system/shutdown", method="POST")

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from app.desktop.instance import InstanceMetadata, InstanceStore
-from app.desktop.launcher import launch, wait_for_process_exit
+from app.desktop.launcher import launch, shutdown_existing, wait_for_process_exit
 from app.runtime.paths import AppPaths
 
 
@@ -113,3 +113,24 @@ def test_shutdown_waits_for_service_process_to_exit():
 
     assert stopped is True
     assert sleeps == [0.1, 0.1]
+
+
+def test_shutdown_refuses_success_for_unhealthy_running_instance(tmp_path: Path, monkeypatch):
+    paths = _paths(tmp_path)
+    paths.ensure_directories()
+    InstanceStore(paths.runtime).write(InstanceMetadata(pid=4321, port=54324))
+    monkeypatch.setattr("app.desktop.launcher.validate_instance", lambda _metadata: False)
+    monkeypatch.setattr("app.desktop.launcher.process_is_running", lambda _pid: True)
+
+    assert shutdown_existing(paths) == 1
+
+
+def test_shutdown_cleans_stale_unhealthy_instance_metadata(tmp_path: Path, monkeypatch):
+    paths = _paths(tmp_path)
+    paths.ensure_directories()
+    InstanceStore(paths.runtime).write(InstanceMetadata(pid=4322, port=54325))
+    monkeypatch.setattr("app.desktop.launcher.validate_instance", lambda _metadata: False)
+    monkeypatch.setattr("app.desktop.launcher.process_is_running", lambda _pid: False)
+
+    assert shutdown_existing(paths) == 0
+    assert InstanceStore(paths.runtime).read() is None

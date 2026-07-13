@@ -2,7 +2,6 @@
 param(
     [string]$GitleaksPath = '',
     [string[]]$ForbiddenPatterns = @(
-        'C:\\Users\\[A-Za-z0-9._-]+',
         'sk-[A-Za-z0-9_-]{20,}'
     )
 )
@@ -14,9 +13,12 @@ $installer = Join-Path $release '半导体复习台-0.1.0-beta-Setup.exe'
 $guide = Join-Path $release '安装与使用说明.pdf'
 $checksum = "$installer.sha256"
 $publish = Join-Path $release 'publish'
+$staging = Join-Path $release 'staging\SemiconductorReview'
 $config = Join-Path $root '.gitleaks.toml'
 $securityRoot = Join-Path $root 'build\security-source'
 $securityArchive = Join-Path $root 'build\security-source.zip'
+$userProfilePattern = [Regex]::Escape([Environment]::GetFolderPath('UserProfile'))
+$effectiveForbiddenPatterns = @($ForbiddenPatterns) + @($userProfilePattern)
 
 function Assert-NativeSuccess([string]$Step) {
     if ($LASTEXITCODE -ne 0) { throw "$Step 失败，退出码：$LASTEXITCODE" }
@@ -38,7 +40,7 @@ if ($workingChanges.Count -gt 0) {
 }
 $gitleaks = Resolve-Gitleaks
 
-foreach ($required in @($installer, $guide)) {
+foreach ($required in @($installer, $guide, $staging)) {
     if (-not (Test-Path -LiteralPath $required)) { throw "缺少发布文件：$required" }
 }
 
@@ -84,10 +86,12 @@ Expand-Archive -LiteralPath $securityArchive -DestinationPath $securityRoot
 Assert-NativeSuccess '源代码快照密钥扫描'
 & $gitleaks dir --config $config --redact --max-archive-depth 2 --exit-code 1 $publish
 Assert-NativeSuccess '发布文件密钥扫描'
+& $gitleaks dir --config $config --redact --max-archive-depth 2 --exit-code 1 $staging
+Assert-NativeSuccess '未压缩程序目录密钥扫描'
 
 $rg = Get-Command rg.exe -ErrorAction SilentlyContinue
 if (-not $rg) { throw '未找到 rg.exe，无法执行发布文件隐私模式扫描。' }
-& $rg.Source -a -n -i -- ($ForbiddenPatterns -join '|') $publish
+& $rg.Source -a -n -i -- ($effectiveForbiddenPatterns -join '|') $publish $staging
 if ($LASTEXITCODE -eq 0) { throw '发布文件包含禁止公开的密钥、私有域名或本机绝对路径。' }
 if ($LASTEXITCODE -ne 1) { throw "发布文件隐私模式扫描失败，退出码：$LASTEXITCODE" }
 
