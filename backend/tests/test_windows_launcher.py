@@ -4,6 +4,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -40,15 +41,24 @@ def _script_command(script: str, *arguments: str) -> list[str]:
 
 
 def _run_script(script: str, *arguments: str, env: dict[str, str]) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        _script_command(script, *arguments),
-        cwd=PROJECT_ROOT,
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-        timeout=40,
-        check=False,
+    with tempfile.TemporaryFile() as output:
+        completed = subprocess.run(
+            _script_command(script, *arguments),
+            cwd=PROJECT_ROOT,
+            env=env,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            timeout=40,
+            check=False,
+        )
+        output.seek(0)
+        captured = output.read()
+    return subprocess.CompletedProcess(
+        completed.args,
+        completed.returncode,
+        stdout=captured,
+        stderr=None,
     )
 
 
