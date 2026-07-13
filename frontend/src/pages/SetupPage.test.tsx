@@ -30,16 +30,27 @@ describe('first-run setup', () => {
 
   it('saves the user key without echoing it back', async () => {
     const user = userEvent.setup()
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        provider: 'openai_compatible',
-        base_url: 'https://models.example/v1',
-        model: 'fast-model',
-        api_key_configured: true,
-        vision_enabled: true,
-      }),
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/api/settings/ai/test')) {
+        return { ok: true, status: 200, json: async () => ({ ok: true, message: '连接成功' }) }
+      }
+      if (url.endsWith('/api/settings/ai') && init?.method === 'PUT') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            provider: 'openai_compatible', base_url: 'https://models.example/v1',
+            model: 'fast-model', api_key_configured: true, vision_enabled: true,
+          }),
+        }
+      }
+      if (url.endsWith('/api/system/setup-complete')) return { ok: true, status: 204 }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ today_new_lessons: 0, due_count: 0, estimated_minutes: 0, weak_points: [] }),
+      }
     })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -53,13 +64,37 @@ describe('first-run setup', () => {
     await user.type(screen.getByLabelText('服务地址'), 'https://models.example/v1')
     await user.type(screen.getByLabelText('模型名称'), 'fast-model')
     await user.type(screen.getByLabelText('API Key'), 'private-test-key')
-    await user.click(screen.getByRole('button', { name: '保存并进入复习台' }))
+    await user.click(screen.getByRole('button', { name: '测试、保存并进入复习台' }))
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/settings/ai'),
-      expect.objectContaining({ method: 'PUT' }),
+      expect.stringContaining('/api/settings/ai/test'),
+      expect.objectContaining({ method: 'POST' }),
     )
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/system/setup-complete'), expect.objectContaining({ method: 'POST' }))
     expect(await screen.findByRole('heading', { name: '今天，先把课堂留下来' })).toBeInTheDocument()
     expect(screen.queryByDisplayValue('private-test-key')).not.toBeInTheDocument()
+  })
+
+  it('does not save an unverified connection', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: false, message: '认证失败' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <MemoryRouter initialEntries={['/setup']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText('模型名称'), 'bad-model')
+    await user.type(screen.getByLabelText('API Key'), 'bad-key')
+    await user.click(screen.getByRole('button', { name: '测试、保存并进入复习台' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('认证失败')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

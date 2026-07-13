@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import platform
 import re
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -16,6 +17,24 @@ from app.runtime.version import APPLICATION_VERSION
 LOG_MAX_BYTES = 5 * 1024 * 1024
 LOG_BACKUP_COUNT = 5
 LOG_EXPORT_LIMIT = 512 * 1024
+SETUP_MARKER_NAME = ".setup-complete"
+
+
+def setup_marker(data_dir: Path) -> Path:
+    return data_dir / SETUP_MARKER_NAME
+
+
+def is_setup_complete(data_dir: Path) -> bool:
+    return setup_marker(data_dir).is_file()
+
+
+def mark_setup_complete(data_dir: Path) -> None:
+    data_dir.mkdir(parents=True, exist_ok=True)
+    setup_marker(data_dir).write_text("complete\n", encoding="ascii")
+
+
+def invalidate_setup(data_dir: Path) -> None:
+    setup_marker(data_dir).unlink(missing_ok=True)
 
 
 def configure_file_logging(log_dir: Path) -> Path:
@@ -49,9 +68,29 @@ def open_directory(path: Path, opener=None) -> None:
 
 def _sanitize(text: str) -> str:
     sanitized = re.sub(
-        r"(?i)(authorization\s*:\s*bearer\s+)[^\s]+",
+        r"(?i)(authorization\s*:\s*(?:bearer|basic)\s+)[^\s]+",
         r"\1[REDACTED]",
         text,
+    )
+    sanitized = re.sub(
+        r"(?i)((?:x-api-key|api-key|x-goog-api-key)\s*:\s*)[^\s]+",
+        r"\1[REDACTED]",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)([?&](?:api[_-]?key|access[_-]?token|token|secret)=)[^&\s\"']+",
+        r"\1[REDACTED]",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)(https?://)[^/@\s]+@",
+        r"\1[REDACTED]@",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r'(?i)([\"\'](?:api[_-]?key|access[_-]?token|token|secret|password)[\"\']\s*:\s*[\"\'])[^\"\']+',
+        r"\1[REDACTED]",
+        sanitized,
     )
     sanitized = re.sub(r"\bsk-[A-Za-z0-9_-]{8,}\b", "[REDACTED]", sanitized)
     home = str(Path.home())
@@ -66,10 +105,12 @@ def create_diagnostics(paths, *, packaged: bool, settings: dict) -> bytes:
         "version": APPLICATION_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "packaged": packaged,
+        "install_method": "windows-installer" if packaged else "source",
+        "windows_version": platform.platform(),
         "data_directory": str(paths.data),
         "log_directory": str(paths.logs),
         "provider": settings.get("provider"),
-        "base_url": settings.get("base_url"),
+        "base_url_configured": bool(settings.get("base_url")),
         "model": settings.get("model"),
         "vision_enabled": settings.get("vision_enabled"),
         "api_key_configured": bool(settings.get("api_key_configured")),

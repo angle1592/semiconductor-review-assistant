@@ -13,9 +13,9 @@ DefaultDirName={localappdata}\Programs\SemiconductorReview
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
+MinVersion=10.0.17763
 OutputDir=..\release
 OutputBaseFilename=半导体复习台-0.1.0-beta-Setup
 Compression=lzma2/ultra64
@@ -42,22 +42,22 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-procedure StopInstalledApplication();
+function StopInstalledApplication(): Boolean;
 var
   ResultCode: Integer;
 begin
+  Result := True;
   if FileExists(ExpandConstant('{app}\{#MyAppExeName}')) then
-  begin
-    Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--shutdown', '', SW_HIDE,
-      ewWaitUntilTerminated, ResultCode);
-    Sleep(1200);
-  end;
+    Result := Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--shutdown', '', SW_HIDE,
+      ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  StopInstalledApplication();
-  Result := '';
+  if StopInstalledApplication() then
+    Result := ''
+  else
+    Result := '无法安全停止正在运行的半导体复习台。请稍后重试。';
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -65,14 +65,15 @@ var
   DataDir: String;
 begin
   if CurUninstallStep = usUninstall then
-    StopInstalledApplication();
+    if not StopInstalledApplication() then
+      RaiseException('无法安全停止正在运行的半导体复习台。');
 
   if CurUninstallStep = usPostUninstall then
   begin
     DataDir := ExpandConstant('{localappdata}\SemiconductorReview');
     if DirExists(DataDir) and
-       (MsgBox('是否同时永久删除本机课程、课件、答案、复习历史、备份和日志？' + #13#10 +
-         '默认建议保留，方便以后重装或升级。', mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES) then
+       (SuppressibleMsgBox('是否同时永久删除本机课程、课件、答案、复习历史、备份和日志？' + #13#10 +
+         '默认建议保留，方便以后重装或升级。', mbConfirmation, MB_YESNO, IDNO) = IDYES) then
       DelTree(DataDir, True, True, True);
   end;
 end;

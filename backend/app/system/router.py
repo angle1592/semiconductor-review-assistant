@@ -8,7 +8,12 @@ from fastapi.responses import StreamingResponse
 from app.desktop.instance import APPLICATION_ID
 from app.runtime.version import APPLICATION_VERSION
 from app.system.schemas import SystemInfo
-from app.system.service import create_diagnostics, open_directory
+from app.system.service import (
+    create_diagnostics,
+    is_setup_complete,
+    mark_setup_complete,
+    open_directory,
+)
 
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -28,10 +33,18 @@ def system_info(request: Request) -> SystemInfo:
         application=APPLICATION_ID,
         version=APPLICATION_VERSION,
         packaged=bool(getattr(request.app.state, "packaged", False)),
-        setup_complete=_setup_complete(request),
+        setup_complete=is_setup_complete(paths.data),
         data_directory=str(paths.data),
         log_directory=str(paths.logs),
     )
+
+
+@router.post("/setup-complete", status_code=status.HTTP_204_NO_CONTENT)
+def complete_setup(request: Request) -> Response:
+    if not _setup_complete(request):
+        raise HTTPException(status_code=409, detail="AI configuration is incomplete.")
+    mark_setup_complete(request.app.state.paths.data)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/paths/{kind}/open", status_code=status.HTTP_204_NO_CONTENT)

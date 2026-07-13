@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
+import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +24,9 @@ from app.shared.request_id import RequestIdMiddleware
 from app.runtime.migrations import migrate_database
 from app.runtime.paths import AppPaths
 from app.system.router import router as system_router
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -77,10 +82,17 @@ def create_app(
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
+        started = time.perf_counter()
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
+        logger.info(
+            "request path=%s status=%s duration_ms=%.1f",
+            request.url.path,
+            response.status_code,
+            (time.perf_counter() - started) * 1000,
+        )
         return response
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)

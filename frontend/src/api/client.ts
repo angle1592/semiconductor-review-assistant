@@ -297,6 +297,7 @@ export const api = {
     return request<{ restored: boolean }>('/api/backups/restore', { method: 'POST', body: form })
   },
   getSystemInfo: () => request<SystemInfo>('/api/system/info'),
+  completeSetup: () => request<void>('/api/system/setup-complete', { method: 'POST' }),
   openSystemPath: (kind: 'data' | 'backups' | 'logs') =>
     request<void>(`/api/system/paths/${kind}/open`, { method: 'POST' }),
   exportDiagnostics: () => requestBlob('/api/system/diagnostics'),

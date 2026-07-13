@@ -38,6 +38,21 @@ try {
         throw '冻结应用就绪标识不正确。'
     }
 
+    $course = Invoke-RestMethod -Uri "http://127.0.0.1:$($metadata.port)/api/courses" `
+        -Method Post -ContentType 'application/json' -Body '{"title":"冻结验证课程","description":"发布前验证"}'
+    $pdfPath = Join-Path $testRoot 'smoke.pdf'
+    $pdfBase64 = 'JVBERi0xLjcKJcK1wrYKJSBXcml0dGVuIGJ5IE11UERGIDEuMjkuMAoKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvSW5mbzw8L1Byb2R1Y2VyKE11UERGIDEuMjkuMCk+Pj4+CmVuZG9iagoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0NvdW50IDEvS2lkc1s0IDAgUl0+PgplbmRvYmoKCjMgMCBvYmoKPDwvRm9udDw8L2hlbHYgNSAwIFI+Pj4+CmVuZG9iagoKNCAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDIwMCAxMjBdL1JvdGF0ZSAwL1Jlc291cmNlcyAzIDAgUi9QYXJlbnQgMiAwIFIvQ29udGVudHNbNiAwIFJdPj4KZW5kb2JqCgo1IDAgb2JqCjw8L1R5cGUvRm9udC9TdWJ0eXBlL1R5cGUxL0Jhc2VGb250L0hlbHZldGljYS9FbmNvZGluZy9XaW5BbnNpRW5jb2Rpbmc+PgplbmRvYmoKCjYgMCBvYmoKPDwvTGVuZ3RoIDY1Pj4Kc3RyZWFtCgpxCkJUCjEgMCAwIDEgMjAgNzAgVG0KL2hlbHYgMTEgVGYgWzw2NDY1NmM2NTc0NjUyMDZkNjU+XVRKCkVUClEKCmVuZHN0cmVhbQplbmRvYmoKCnhyZWYKMCA3CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDA0MiAwMDAwMCBuIAowMDAwMDAwMTIwIDAwMDAwIG4gCjAwMDAwMDAxNzIgMDAwMDAgbiAKMDAwMDAwMDIxMyAwMDAwMCBuIAowMDAwMDAzMjAgMDAwMDAgbiAKMDAwMDAwMDQwOSAwMDAwMCBuIAoKdHJhaWxlcgo8PC9TaXplIDcvUm9vdCAxIDAgUi9JRFs8QzNBNjZCQzM5OUMyQjRDMkI3NEQyODAxMTFDMkJGQzM+PEJBRUM1N0Y4RjlENEI4OTA1MTQ4QzkxN0ZBQTRFQTk1Pl0+PgpzdGFydHhyZWYKNTIyCiUlRU9GCg=='
+    [IO.File]::WriteAllBytes($pdfPath, [Convert]::FromBase64String($pdfBase64))
+    $uploadJson = & curl.exe -sS -f -X POST -F "file=@$pdfPath;type=application/pdf" `
+        "http://127.0.0.1:$($metadata.port)/api/courses/$($course.id)/documents"
+    if ($LASTEXITCODE -ne 0) { throw '冻结应用 PDF 导入失败。' }
+    $document = $uploadJson | ConvertFrom-Json
+    if ($document.page_count -ne 1) { throw '冻结应用 PDF 页码解析不正确。' }
+
+    $backupPath = Join-Path $testRoot 'smoke-backup.zip'
+    Invoke-WebRequest -Uri "http://127.0.0.1:$($metadata.port)/api/backups/export" -OutFile $backupPath -TimeoutSec 20
+    if ((Get-Item -LiteralPath $backupPath).Length -lt 100) { throw '冻结应用备份导出为空。' }
+
     $second = Start-Process -FilePath $Executable -PassThru -WindowStyle Hidden
     $second.WaitForExit(15 * 1000) | Out-Null
     if (-not $second.HasExited -or $second.ExitCode -ne 0) { throw '第二次启动未复用已有实例。' }

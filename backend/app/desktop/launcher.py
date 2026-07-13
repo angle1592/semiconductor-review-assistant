@@ -17,10 +17,46 @@ from app.desktop.instance import (
     find_free_port,
     validate_instance,
 )
+from app.desktop.windows_session import WindowsSessionMonitor
 from app.main import create_app
 from app.runtime.migrations import migrate_database
 from app.runtime.paths import AppPaths
-from app.system.service import configure_file_logging
+from app.system.service import configure_file_logging, is_setup_complete
+
+
+def process_is_running(pid: int) -> bool:
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+    import win32api
+    import win32process
+
+    try:
+        handle = win32api.OpenProcess(0x1000, False, pid)
+    except Exception:
+        return False
+    try:
+        return win32process.GetExitCodeProcess(handle) == 259
+    finally:
+        win32api.CloseHandle(handle)
+
+
+def wait_for_process_exit(
+    pid: int,
+    *,
+    process_running: Callable[[int], bool] = process_is_running,
+    timeout: float = 20,
+    sleep: Callable[[float], None] = time.sleep,
+) -> bool:
+    deadline = time.monotonic() + max(timeout, 0)
+    while process_running(pid):
+        if time.monotonic() >= deadline:
+            return False
+        sleep(0.1)
+    return True
 
 
 def _server_factory(app, port: int):
@@ -69,7 +105,7 @@ def launch(
             return 0
 
         database_path = resolved_paths.data / "review.db"
-        first_run = not database_path.exists()
+        first_run = not is_setup_complete(resolved_paths.data)
         migrate_database(database_path, resolved_paths.backups)
         app = create_app(
             data_dir=resolved_paths.data,
@@ -81,6 +117,8 @@ def launch(
         metadata = InstanceMetadata(pid=os.getpid(), port=port)
         server = server_factory(app, port)
         app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
+        session_monitor = WindowsSessionMonitor(app.state.shutdown_callback)
+        session_monitor.start()
         store.write(metadata)
 
         def open_when_ready() -> None:
@@ -93,6 +131,7 @@ def launch(
         try:
             server.run()
         finally:
+            session_monitor.close()
             store.remove_if_owned_by(os.getpid())
             browser_thread.join(timeout=1)
         return 0
@@ -108,7 +147,9 @@ def shutdown_existing(paths: AppPaths | None = None) -> int:
     try:
         request = Request(f"{metadata.base_url}/api/system/shutdown", method="POST")
         with urlopen(request, timeout=3) as response:
-            return 0 if response.status in (200, 202, 204) else 1
+            if response.status not in (200, 202, 204):
+                return 1
+        return 0 if wait_for_process_exit(metadata.pid) else 1
     except OSError:
         return 1
 

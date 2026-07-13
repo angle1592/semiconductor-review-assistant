@@ -42,7 +42,7 @@ try {
     Pop-Location
 }
 
-& $PythonPath -m pip install --disable-pip-version-check -e "$backend[codex,build]"
+& $PythonPath -m pip install --disable-pip-version-check -e "$backend[codex,build,dev]"
 Assert-NativeSuccess 'Python 构建依赖安装'
 if (-not $SkipTests) {
     $pytestTemp = Join-Path $root 'build\pytest-tmp'
@@ -62,6 +62,10 @@ Assert-NativeSuccess 'PyInstaller 构建'
 $bundle = Join-Path $buildRoot 'dist\SemiconductorReview'
 if (-not (Test-Path -LiteralPath (Join-Path $bundle 'SemiconductorReview.exe'))) {
     throw 'PyInstaller 未生成 SemiconductorReview.exe。'
+}
+$codexRuntime = Join-Path $bundle '_internal\codex_cli_bin\bin\codex.exe'
+if (-not (Test-Path -LiteralPath $codexRuntime)) {
+    throw 'PyInstaller 未收集 Codex SDK 所需的固定版本 codex.exe。'
 }
 if (Test-Path -LiteralPath $staging) {
     $resolvedRelease = (Resolve-Path (Join-Path $root 'release')).Path

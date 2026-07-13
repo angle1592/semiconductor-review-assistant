@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from app.desktop.instance import InstanceMetadata, InstanceStore
-from app.desktop.launcher import launch
+from app.desktop.launcher import launch, wait_for_process_exit
 from app.runtime.paths import AppPaths
 
 
@@ -78,3 +78,38 @@ def test_first_launch_runs_server_and_cleans_runtime_metadata(tmp_path: Path):
     assert opened == ["http://127.0.0.1:54322/setup"]
     assert InstanceStore(paths.runtime).read() is None
     assert mutex.closed
+
+
+def test_completed_setup_opens_dashboard_on_new_process(tmp_path: Path):
+    paths = _paths(tmp_path)
+    paths.ensure_directories()
+    (paths.data / ".setup-complete").write_text("complete", encoding="ascii")
+    server = FakeServer()
+    opened: list[str] = []
+
+    result = launch(
+        paths,
+        mutex_factory=lambda: FakeMutex(acquired=True),
+        server_factory=lambda _app, _port: server,
+        browser_open=opened.append,
+        validator=lambda _metadata: True,
+        port_picker=lambda: 54323,
+    )
+
+    assert result == 0
+    assert opened == ["http://127.0.0.1:54323/"]
+
+
+def test_shutdown_waits_for_service_process_to_exit():
+    states = iter([True, True, False])
+    sleeps: list[float] = []
+
+    stopped = wait_for_process_exit(
+        1234,
+        process_running=lambda _pid: next(states),
+        timeout=1,
+        sleep=lambda seconds: sleeps.append(seconds),
+    )
+
+    assert stopped is True
+    assert sleeps == [0.1, 0.1]

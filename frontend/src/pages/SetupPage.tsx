@@ -22,7 +22,12 @@ export function SetupPage() {
   const [form, setForm] = useState(initialForm)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const save = useMutation({
-    mutationFn: api.saveAISettings,
+    mutationFn: async (settings: SetupForm) => {
+      const result = await api.testAISettings(settings)
+      if (!result.ok) throw new Error(result.message || '连接测试失败')
+      await api.saveAISettings(settings)
+      await api.completeSetup()
+    },
     onSuccess: () => navigate('/', { replace: true }),
   })
 
@@ -62,9 +67,9 @@ export function SetupPage() {
           </div>
         )}
 
-        {save.isError && <div className="notice notice--error" role="alert">设置未保存，请检查本地服务后重试。</div>}
+        {save.isError && <div className="notice notice--error" role="alert">{save.error instanceof Error ? save.error.message : '设置未保存，请检查本地服务后重试。'}</div>}
         <div className="setup-actions">
-          <button className="button button--primary button--large" type="submit" disabled={save.isPending}>{save.isPending ? '正在保存…' : '保存并进入复习台'}</button>
+          <button className="button button--primary button--large" type="submit" disabled={save.isPending}>{save.isPending ? '正在测试并保存…' : '测试、保存并进入复习台'}</button>
           <button className="button button--ghost" type="button" onClick={() => setShowAdvanced((value) => !value)}><ChevronDown aria-hidden="true" />高级：使用 Codex</button>
         </div>
         {showAdvanced && (
