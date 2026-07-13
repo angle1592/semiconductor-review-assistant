@@ -12,22 +12,22 @@
 
 请从 GitHub Release 下载以下三个文件：
 
-- `半导体复习台-0.1.0-beta-Setup.exe`：安装程序；
-- `半导体复习台-0.1.0-beta-Setup.exe.sha256`：安装程序校验值；
-- `安装与使用说明.pdf`：本说明。
+- `SemiconductorReview-0.1.0-beta-Setup.exe`：安装程序；
+- `SemiconductorReview-0.1.0-beta-Setup.exe.sha256`：安装程序校验值；
+- `SemiconductorReview-Guide-zh-CN.pdf`：本说明。
 
 把安装程序和 SHA256 文件放在同一目录，打开 PowerShell，执行：
 
 ```powershell
-Get-FileHash '.\半导体复习台-0.1.0-beta-Setup.exe' -Algorithm SHA256
-Get-Content '.\半导体复习台-0.1.0-beta-Setup.exe.sha256'
+Get-FileHash '.\SemiconductorReview-0.1.0-beta-Setup.exe' -Algorithm SHA256
+Get-Content '.\SemiconductorReview-0.1.0-beta-Setup.exe.sha256'
 ```
 
 两处显示的 64 位十六进制摘要必须完全相同。不同就不要运行安装程序，请重新下载。
 
 ## 2. 安装
 
-1. 双击 `半导体复习台-0.1.0-beta-Setup.exe`；
+1. 双击 `SemiconductorReview-0.1.0-beta-Setup.exe`；
 2. 保持默认安装位置并完成安装；
 3. 从桌面或开始菜单打开“半导体复习台”；
 4. 程序会启动本机服务并在默认浏览器中打开页面，不需要命令行。

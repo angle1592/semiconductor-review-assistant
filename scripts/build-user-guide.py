@@ -156,6 +156,6 @@ def build(source: Path, output: Path) -> None:
 if __name__ == "__main__":
     repository = Path(__file__).resolve().parents[1]
     source_path = Path(sys.argv[1]) if len(sys.argv) > 1 else repository / "docs" / "user-guide" / "windows-beta-installation.md"
-    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else repository / "release" / "安装与使用说明.pdf"
+    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else repository / "release" / "SemiconductorReview-Guide-zh-CN.pdf"
     build(source_path.resolve(), output_path.resolve())
     print(output_path.resolve())

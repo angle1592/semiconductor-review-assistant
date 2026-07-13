@@ -174,9 +174,9 @@ SQLite仍是单机正式数据的唯一权威来源。备份导出继续包含�
 发布产物示例：
 
 ```text
-半导体复习台-0.1.0-beta-Setup.exe
-半导体复习台-0.1.0-beta-SHA256.txt
-安装与使用说明.pdf
+SemiconductorReview-0.1.0-beta-Setup.exe
+SemiconductorReview-0.1.0-beta-Setup.exe.sha256
+SemiconductorReview-Guide-zh-CN.pdf
 ```
 
 由于测试版不签名，说明文档必须解释 SmartScreen 的“更多信息 → 仍要运行”，并强调安装包只应从开发者本人处获取。
@@ -189,9 +189,9 @@ SQLite仍是单机正式数据的唯一权威来源。备份导出继续包含�
 
 每个测试版本创建带注释标签，例如 `v0.1.0-beta`，并建立对应 GitHub Release。Release 至少上传：
 
-- `半导体复习台-0.1.0-beta-Setup.exe`；
-- `半导体复习台-0.1.0-beta-SHA256.txt`；
-- `安装与使用说明.pdf`。
+- `SemiconductorReview-0.1.0-beta-Setup.exe`；
+- `SemiconductorReview-0.1.0-beta-Setup.exe.sha256`；
+- `SemiconductorReview-Guide-zh-CN.pdf`。
 
 Release 说明包含支持系统、未签名 SmartScreen 提示、PowerPoint要求、个人 API 配置、覆盖升级和数据保留说明。上传完成后从 GitHub Release 实际下载一次，校验 SHA-256 并执行安装烟雾测试。
 

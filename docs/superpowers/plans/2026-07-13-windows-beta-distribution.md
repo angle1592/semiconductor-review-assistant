@@ -131,7 +131,7 @@ class AppPaths:
 - [ ] 配置 `PrivilegesRequired=lowest`、`ArchitecturesAllowed=x64compatible`、稳定 AppId、`{localappdata}\Programs\SemiconductorReview`、开始菜单和可选桌面快捷方式。
 - [ ] 在升级和卸载前调用旧版 `SemiconductorReview.exe --shutdown`；覆盖升级只替换程序文件。
 - [ ] 卸载默认保留 `%LOCALAPPDATA%\SemiconductorReview`，卸载末尾单独询问是否删除个人学习数据，默认选择“否”。
-- [ ] 构建 `release/半导体复习台-0.1.0-beta-Setup.exe`，静默安装到测试目录并运行端到端健康检查，再卸载并验证个人数据仍在。
+- [ ] 构建 `release/SemiconductorReview-0.1.0-beta-Setup.exe`，静默安装到测试目录并运行端到端健康检查，再卸载并验证个人数据仍在。
 - [ ] 提交：`git commit -am "build: add per-user Windows installer"`。
 
 安装器核心设置：
@@ -141,7 +141,7 @@ class AppPaths:
 AppId={{A74E3B83-222F-4C35-B27C-7238356FE5CD}
 PrivilegesRequired=lowest
 DefaultDirName={localappdata}\Programs\SemiconductorReview
-OutputBaseFilename=半导体复习台-0.1.0-beta-Setup
+OutputBaseFilename=SemiconductorReview-0.1.0-beta-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 ```
@@ -156,7 +156,7 @@ SolidCompression=yes
 - Create: `docs/releases/v0.1.0-beta.md`
 
 - [ ] 编写中文安装指南：系统要求、下载校验、SmartScreen、首次 API 配置、PPT 前提、备份恢复、升级、卸载、日志与问题反馈。
-- [ ] 用项目脚本生成 `release/安装与使用说明.pdf`，按 PDF 技能要求渲染检查每一页。
+- [ ] 用项目脚本生成 `release/SemiconductorReview-Guide-zh-CN.pdf`，按 PDF 技能要求渲染检查每一页。
 - [ ] 生成安装包 SHA256 文件，格式为 `<64位小写摘要>  <文件名>`。
 - [ ] 使用 Gitleaks 扫描工作树和完整 Git 历史；对构建目录再次扫描，并用字符串搜索确认发布物不含用户给出的服务地址、密钥、用户名或绝对开发路径。
 - [ ] 在干净临时目录核对 Release 只包含安装器、SHA256、PDF。

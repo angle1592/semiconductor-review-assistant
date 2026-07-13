@@ -7,8 +7,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $release = Join-Path $root 'release'
-$installer = Join-Path $release '半导体复习台-0.1.0-beta-Setup.exe'
-$guide = Join-Path $release '安装与使用说明.pdf'
+$installer = Join-Path $release 'SemiconductorReview-0.1.0-beta-Setup.exe'
+$guide = Join-Path $release 'SemiconductorReview-Guide-zh-CN.pdf'
 $checksum = "$installer.sha256"
 $publish = Join-Path $release 'publish'
 $staging = Join-Path $release 'staging\SemiconductorReview'
