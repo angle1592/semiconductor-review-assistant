@@ -43,4 +43,4 @@
 - [x] Run the complete backend test suite and Ruff.
 - [x] Run a manual lifecycle check on an unused port and confirm no process remains after `stop.ps1`.
 - [x] Mark the plan complete and commit the implementation.
-- [ ] Merge to `main`, run `install-shortcut.ps1`, and verify the desktop shortcut reopens a single healthy instance on port 8000.
+- [x] Merge to `main`, run `install-shortcut.ps1`, and verify the desktop shortcut reopens a single healthy instance on port 8000.
