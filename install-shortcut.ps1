@@ -25,12 +25,18 @@ New-Item -ItemType Directory -Path $ShortcutDirectory -Force | Out-Null
 
 $PowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
 $Shell = New-Object -ComObject WScript.Shell
-$Shortcut = $Shell.CreateShortcut($ShortcutPath)
-$Shortcut.TargetPath = $PowerShell
-$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartScript`""
-$Shortcut.WorkingDirectory = Split-Path -Parent $StartScript
-$Shortcut.Description = '打开半导体课后复习助手'
-$Shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,14"
-$Shortcut.Save()
+$TemporaryShortcutPath = Join-Path $ShortcutDirectory ".semireview-$([guid]::NewGuid().ToString('N')).lnk"
+try {
+    $Shortcut = $Shell.CreateShortcut($TemporaryShortcutPath)
+    $Shortcut.TargetPath = $PowerShell
+    $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartScript`""
+    $Shortcut.WorkingDirectory = Split-Path -Parent $StartScript
+    $Shortcut.Description = '打开半导体课后复习助手'
+    $Shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,14"
+    $Shortcut.Save()
+    Move-Item -LiteralPath $TemporaryShortcutPath -Destination $ShortcutPath -Force
+} finally {
+    Remove-Item -LiteralPath $TemporaryShortcutPath -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host "桌面快捷方式已创建：$ShortcutPath" -ForegroundColor Green

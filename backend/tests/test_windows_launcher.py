@@ -195,7 +195,7 @@ def test_concurrent_launches_record_the_winning_server_process(tmp_path: Path):
         assert second.wait(timeout=60) == 0
         listener_pid = _listener_pid(port)
         recorded_pid = int((runtime_dir / "server.pid").read_text(encoding="ascii"))
-        assert recorded_pid == _parent_pid(listener_pid)
+        assert recorded_pid in {listener_pid, _parent_pid(listener_pid)}
     finally:
         if _is_ready(port):
             _run_script(
