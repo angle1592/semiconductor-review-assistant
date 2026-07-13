@@ -21,6 +21,7 @@ from app.shared.errors import AppError, app_error_handler, unexpected_error_hand
 from app.shared.request_id import RequestIdMiddleware
 from app.runtime.migrations import migrate_database
 from app.runtime.paths import AppPaths
+from app.system.router import router as system_router
 
 
 def create_app(
@@ -42,6 +43,15 @@ def create_app(
 
     app = FastAPI(title="Semiconductor Review Assistant", lifespan=lifespan)
     app.state.data_dir = resolved_data_dir
+    app.state.paths = AppPaths(
+        root=resolved_data_dir.parent,
+        data=resolved_data_dir,
+        backups=resolved_data_dir.parent / "Backups",
+        logs=resolved_data_dir.parent / "Logs",
+        runtime=resolved_data_dir.parent / "Runtime",
+        frontend_dist=Path(frontend_dist_dir).resolve() if frontend_dist_dir else resolved_data_dir.parent / "frontend" / "dist",
+    )
+    app.state.packaged = False
     app.state.database = create_database(resolved_data_dir)
     app.state.ai_settings_service = AISettingsService(
         app.state.database,
@@ -79,6 +89,7 @@ def create_app(
     app.include_router(ai_router)
     app.include_router(learning_router)
     app.include_router(backup_router)
+    app.include_router(system_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:

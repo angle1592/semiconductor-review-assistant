@@ -20,6 +20,7 @@ from app.desktop.instance import (
 from app.main import create_app
 from app.runtime.migrations import migrate_database
 from app.runtime.paths import AppPaths
+from app.system.service import configure_file_logging
 
 
 def _server_factory(app, port: int):
@@ -55,6 +56,7 @@ def launch(
 ) -> int:
     resolved_paths = paths or AppPaths.discover()
     resolved_paths.ensure_directories()
+    configure_file_logging(resolved_paths.logs)
     store = InstanceStore(resolved_paths.runtime)
     mutex = mutex_factory()
     acquired = mutex.acquire()
