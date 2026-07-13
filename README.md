@@ -2,7 +2,7 @@
 
 一个本地优先的课后复习助手：导入培训课件，选择当天页面，用 10～15 分钟完成主动回忆、纠错、自评和间隔复习。
 
-普通使用者请从 GitHub Release 下载 Windows 安装包，无需安装 Python 或 Node。下面的 PowerShell 方式只用于源码开发。
+普通使用者请从 [GitHub Releases](https://github.com/angle1592/semiconductor-review-assistant/releases) 下载 Windows 安装包，无需安装 Python 或 Node。安装前请按同名 SHA256 文件校验摘要。下面的 PowerShell 方式只用于源码开发。
 
 ## Windows 快速开始
 
