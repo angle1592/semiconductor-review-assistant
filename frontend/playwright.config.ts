@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url'
 const frontendDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(frontendDir, '..')
 const backendDir = path.join(projectRoot, 'backend')
-const pythonExecutable = process.platform === 'win32'
+const pythonExecutable = process.env.SEMIREVIEW_PYTHON ?? (process.platform === 'win32'
   ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
-  : path.join(backendDir, '.venv', 'bin', 'python')
+  : path.join(backendDir, '.venv', 'bin', 'python'))
 const baseURL = 'http://127.0.0.1:8765'
 
 export default defineConfig({

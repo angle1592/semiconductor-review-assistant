@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -30,7 +32,13 @@ async def app_error_handler(request: Request, error: AppError) -> JSONResponse:
     )
 
 
-async def unexpected_error_handler(request: Request, _error: Exception) -> JSONResponse:
+async def unexpected_error_handler(request: Request, error: Exception) -> JSONResponse:
+    logger.error(
+        "unexpected_error request_id=%s path=%s exception=%s",
+        request.state.request_id,
+        request.url.path,
+        type(error).__name__,
+    )
     return JSONResponse(
         status_code=500,
         content={
@@ -39,3 +47,4 @@ async def unexpected_error_handler(request: Request, _error: Exception) -> JSONR
             "request_id": request.state.request_id,
         },
     )
+logger = logging.getLogger(__name__)

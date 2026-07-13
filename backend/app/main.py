@@ -1,6 +1,7 @@
-import os
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
+import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,12 @@ from app.learning.router import router as learning_router
 from app.shared.database import create_database
 from app.shared.errors import AppError, app_error_handler, unexpected_error_handler
 from app.shared.request_id import RequestIdMiddleware
+from app.runtime.migrations import migrate_database
+from app.runtime.paths import AppPaths
+from app.system.router import router as system_router
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -41,6 +48,15 @@ def create_app(
 
     app = FastAPI(title="Semiconductor Review Assistant", lifespan=lifespan)
     app.state.data_dir = resolved_data_dir
+    app.state.paths = AppPaths(
+        root=resolved_data_dir.parent,
+        data=resolved_data_dir,
+        backups=resolved_data_dir.parent / "Backups",
+        logs=resolved_data_dir.parent / "Logs",
+        runtime=resolved_data_dir.parent / "Runtime",
+        frontend_dist=Path(frontend_dist_dir).resolve() if frontend_dist_dir else resolved_data_dir.parent / "frontend" / "dist",
+    )
+    app.state.packaged = False
     app.state.database = create_database(resolved_data_dir)
     app.state.ai_settings_service = AISettingsService(
         app.state.database,
@@ -66,10 +82,25 @@ def create_app(
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
-        response = await call_next(request)
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.info(
+                "request path=%s status=500 duration_ms=%.1f",
+                request.url.path,
+                (time.perf_counter() - started) * 1000,
+            )
+            raise
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
+        logger.info(
+            "request path=%s status=%s duration_ms=%.1f",
+            request.url.path,
+            response.status_code,
+            (time.perf_counter() - started) * 1000,
+        )
         return response
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)
@@ -78,6 +109,7 @@ def create_app(
     app.include_router(ai_router)
     app.include_router(learning_router)
     app.include_router(backup_router)
+    app.include_router(system_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -116,7 +148,9 @@ def create_app(
 
 
 def create_default_app() -> FastAPI:
-    project_root = Path(__file__).resolve().parents[2]
-    data_dir = Path(os.getenv("SEMIREVIEW_DATA_DIR", project_root / "data"))
-    frontend_dir = Path(os.getenv("SEMIREVIEW_FRONTEND_DIST", project_root / "frontend" / "dist"))
-    return create_app(data_dir=data_dir, frontend_dist_dir=frontend_dir)
+    paths = AppPaths.discover()
+    paths.ensure_directories()
+    migrate_database(paths.data / "review.db", paths.backups)
+    app = create_app(data_dir=paths.data, frontend_dist_dir=paths.frontend_dist)
+    app.state.paths = paths
+    return app

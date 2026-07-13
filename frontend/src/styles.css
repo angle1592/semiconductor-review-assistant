@@ -318,6 +318,20 @@ label small { color: var(--muted); font-size: 11px; font-weight: 400; }
 .privacy-strip { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border: 1px solid var(--teal); color: var(--teal); background: var(--teal-soft); }
 .privacy-strip > svg { flex: 0 0 auto; }
 .privacy-strip p { margin: 0; color: #2d625b; font-size: 12px; }
+.desktop-tools { display: flex; flex-wrap: wrap; gap: 10px; }
+.setup-page { width: min(760px, 100%) !important; padding: 28px 0 60px; }
+.setup-mark { display: grid; width: 58px; height: 58px; margin-bottom: 22px; place-items: center; border: 1px solid var(--orange); border-radius: 50%; color: var(--orange-dark); background: var(--orange-soft); }
+.setup-mark svg { width: 25px; height: 25px; }
+.setup-intro { max-width: 680px; font-size: 16px; }
+.setup-form { margin: 28px 0 20px; padding: 28px; border: 1px solid var(--line-strong); background: var(--surface); box-shadow: var(--shadow); }
+.setup-form .form-grid { margin-top: 0; }
+.setup-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
+.advanced-choice { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 15px; border: 1px dashed var(--line-strong); color: var(--muted); background: var(--paper-cool); cursor: pointer; }
+.advanced-choice span { font-size: 12px; }
+.advanced-provider { display: grid; grid-template-columns: auto 1fr; gap: 16px; padding: 18px; border: 1px solid var(--orange); background: var(--orange-soft); }
+.advanced-provider > svg { color: var(--orange-dark); }
+.advanced-provider p { margin: 0; font-size: 12px; }
+.advanced-provider label { grid-column: 1 / -1; }
 
 @media (max-width: 1040px) {
   .dashboard-grid, .notes-grid { grid-template-columns: 1fr 1fr; }
@@ -361,6 +375,8 @@ label small { color: var(--muted); font-size: 11px; font-weight: 400; }
   .provider-choice label { grid-row: auto; }
   .settings-section { padding: 20px; }
   .backup-grid .button { grid-column: 1 / -1; width: 100%; }
+  .setup-actions { align-items: stretch; flex-direction: column; }
+  .setup-actions .button { width: 100%; }
   .question-card { padding: 23px 18px; }
   .question-meta { align-items: flex-start; flex-direction: column; }
   .self-rating { align-items: stretch; display: grid; grid-template-columns: repeat(3, 1fr); }

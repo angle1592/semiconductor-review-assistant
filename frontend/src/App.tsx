@@ -10,6 +10,7 @@ import { LessonPage } from './pages/LessonPage'
 import { ProgressPage } from './pages/ProgressPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SetupPage } from './pages/SetupPage'
 
 const navigation: ReadonlyArray<{ to: string; label: string; icon: LucideIcon; end?: boolean }> = [
   { to: '/', label: '首页', icon: Home, end: true },
@@ -48,6 +49,7 @@ function AppShell() {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/setup" element={<SetupPage />} />
           <Route path="*" element={<DashboardPage />} />
         </Routes>
       </main>

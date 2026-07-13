@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArchiveRestore, CheckCircle2, Download, KeyRound, ServerCog, ShieldCheck, Upload } from 'lucide-react'
+import { ArchiveRestore, Bug, CheckCircle2, Download, FolderOpen, KeyRound, Power, ServerCog, ShieldCheck, Upload } from 'lucide-react'
 
 import { api, type AISettings } from '../api/client'
 import { PageHeading } from '../components/Ui'
@@ -48,6 +48,28 @@ export function SettingsPage() {
       URL.revokeObjectURL(url)
       setMessage('完整备份已导出；文件中不包含 API Key。')
     },
+  })
+  const openPath = useMutation({
+    mutationFn: api.openSystemPath,
+    onSuccess: () => setMessage('已在资源管理器中打开本机目录。'),
+  })
+  const diagnostics = useMutation({
+    mutationFn: api.exportDiagnostics,
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `semiconductor-review-diagnostics-${new Date().toISOString().slice(0, 10)}.zip`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      setMessage('脱敏诊断包已导出；不包含课件、数据库、备份或 API Key。')
+    },
+  })
+  const shutdown = useMutation({
+    mutationFn: api.shutdown,
+    onSuccess: () => setMessage('本地服务正在安全退出，现在可以关闭此页面。'),
   })
 
   useEffect(() => {
@@ -129,6 +151,20 @@ export function SettingsPage() {
           </article>
         </div>
         {(backup.isError || restore.isError) && <div className="notice notice--error">备份操作未完成。请确认本地服务正在运行，且恢复文件未被修改。</div>}
+      </section>
+
+      <section className="settings-section lab-section">
+        <div className="settings-title">
+          <span><FolderOpen aria-hidden="true" /></span>
+          <div><p className="eyebrow">桌面维护</p><h2>本机目录与服务</h2></div>
+        </div>
+        <div className="desktop-tools">
+          <button className="button button--secondary" type="button" onClick={() => openPath.mutate('data')}><FolderOpen aria-hidden="true" />打开数据目录</button>
+          <button className="button button--secondary" type="button" onClick={() => openPath.mutate('logs')}><FolderOpen aria-hidden="true" />打开日志目录</button>
+          <button className="button button--secondary" type="button" disabled={diagnostics.isPending} onClick={() => diagnostics.mutate()}><Bug aria-hidden="true" />{diagnostics.isPending ? '正在导出…' : '导出诊断包'}</button>
+          <button className="button button--danger" type="button" disabled={shutdown.isPending} onClick={() => { if (window.confirm('退出后复习台将暂时不可访问；下次从快捷方式重新启动。确定退出吗？')) shutdown.mutate() }}><Power aria-hidden="true" />退出本地服务</button>
+        </div>
+        {(openPath.isError || diagnostics.isError || shutdown.isError) && <div className="notice notice--error">桌面操作未完成，请从快捷方式重启应用后再试。</div>}
       </section>
 
       <div className="privacy-strip"><ShieldCheck aria-hidden="true" /><p><strong>本机数据是唯一权威来源。</strong> 云端只处理你明确选择的页面与课堂补充，不接收整份课件。</p></div>
