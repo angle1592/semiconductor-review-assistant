@@ -17,12 +17,12 @@
 - Modify: `start.ps1`
 - Create: `stop.ps1`
 
-- [ ] Write a Windows-only integration test that invokes `start.ps1` twice on a random port with `-NoBrowser`, verifies `server.pid` is unchanged, invokes `stop.ps1`, and verifies readiness disappears.
-- [ ] Write a second test that owns a random port with an unrelated socket and verifies `start.ps1` exits nonzero without disturbing the socket.
-- [ ] Run `python -m pytest tests/test_windows_launcher.py -q` and verify both tests fail because the launcher parameters and stopper do not exist.
-- [ ] Replace the Enter-bound launcher lifecycle with readiness reuse, runtime metadata, detached startup, and startup cleanup.
-- [ ] Implement `stop.ps1` with graceful signaling and verified-process fallback.
-- [ ] Run the focused integration tests and verify they pass.
+- [x] Write a Windows-only integration test that invokes `start.ps1` twice on a random port with `-NoBrowser`, verifies `server.pid` is unchanged, invokes `stop.ps1`, and verifies readiness disappears.
+- [x] Write a second test that owns a random port with an unrelated socket and verifies `start.ps1` exits nonzero without disturbing the socket.
+- [x] Run `python -m pytest tests/test_windows_launcher.py -q` and verify both tests fail because the launcher parameters and stopper do not exist.
+- [x] Replace the Enter-bound launcher lifecycle with readiness reuse, runtime metadata, detached startup, and startup cleanup.
+- [x] Implement `stop.ps1` with graceful signaling and verified-process fallback.
+- [x] Run the focused integration tests and verify they pass.
 
 ### Task 2: Desktop shortcut installer
 
@@ -30,18 +30,17 @@
 - Modify: `backend/tests/test_windows_launcher.py`
 - Create: `install-shortcut.ps1`
 
-- [ ] Add a test that installs a shortcut to a temporary path and reads it through `WScript.Shell`.
-- [ ] Run the focused shortcut test and verify it fails because the installer does not exist.
-- [ ] Implement the installer with a desktop default, hidden PowerShell arguments, working directory, description, and icon.
-- [ ] Run all launcher tests and verify they pass.
+- [x] Add a test that installs a shortcut to a temporary path and reads it through `WScript.Shell`.
+- [x] Run the focused shortcut test and verify it fails because the installer does not exist.
+- [x] Implement the installer with a desktop default, hidden PowerShell arguments, working directory, description, and icon.
+- [x] Run all launcher tests and verify they pass.
 
 ### Task 3: Full verification and installation
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-13-windows-launcher-lifecycle.md`
 
-- [ ] Run the complete backend test suite and Ruff.
-- [ ] Run a manual lifecycle check on an unused port and confirm no process remains after `stop.ps1`.
-- [ ] Mark the plan complete and commit the implementation.
+- [x] Run the complete backend test suite and Ruff.
+- [x] Run a manual lifecycle check on an unused port and confirm no process remains after `stop.ps1`.
+- [x] Mark the plan complete and commit the implementation.
 - [ ] Merge to `main`, run `install-shortcut.ps1`, and verify the desktop shortcut reopens a single healthy instance on port 8000.
-
