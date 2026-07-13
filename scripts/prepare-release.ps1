@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$GitleaksPath = '',
     [string[]]$ForbiddenPatterns = @()
