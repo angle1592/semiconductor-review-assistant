@@ -26,7 +26,7 @@ if ([string]::IsNullOrWhiteSpace($PythonPath)) {
     $PythonPath = Join-Path $Backend '.venv\Scripts\python.exe'
 }
 
-function Test-ReviewAssistantReady {
+function Get-ReviewAssistantReadiness {
     $WebResponse = $null
     try {
         $Request = [System.Net.HttpWebRequest]::Create("$Url/ready")
@@ -40,9 +40,18 @@ function Test-ReviewAssistantReady {
         } finally {
             $Reader.Dispose()
         }
-        return $Response.status -eq 'ok' -and $Response.checks.database -eq 'ok'
+        if ($Response.status -ne 'ok' -or $Response.checks.database -ne 'ok') {
+            return 'none'
+        }
+        if (
+            $Response.application -eq 'semiconductor-review-assistant' -and
+            $Response.protocol_version -eq 1
+        ) {
+            return 'current'
+        }
+        return 'legacy'
     } catch {
-        return $false
+        return 'none'
     } finally {
         if ($null -ne $WebResponse) {
             $WebResponse.Dispose()
@@ -53,6 +62,31 @@ function Test-ReviewAssistantReady {
 function Test-LauncherPortInUse {
     return [bool]([System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() |
         Where-Object { $_.Port -eq $Port })
+}
+
+function Get-ListenerProcessId {
+    foreach ($Line in netstat -ano -p tcp) {
+        if ($Line -match "^\s*TCP\s+\S+:$Port\s+\S+\s+LISTENING\s+(\d+)\s*$") {
+            return [int]$Matches[1]
+        }
+    }
+    return $null
+}
+
+function Test-VerifiedRunnerListener {
+    $ListenerId = Get-ListenerProcessId
+    if ($null -eq $ListenerId) {
+        return $false
+    }
+    $ProcessInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$ListenerId" -ErrorAction SilentlyContinue
+    if ($null -eq $ProcessInfo -or [string]::IsNullOrWhiteSpace($ProcessInfo.CommandLine)) {
+        return $false
+    }
+    $HasPythonPath = $ProcessInfo.CommandLine.IndexOf(
+        $PythonPath,
+        [StringComparison]::OrdinalIgnoreCase
+    ) -ge 0
+    return $HasPythonPath -and $ProcessInfo.CommandLine -like '*-m app.runner*'
 }
 
 function Restore-EnvironmentValue {
@@ -68,7 +102,40 @@ function Restore-EnvironmentValue {
     }
 }
 
-if (Test-ReviewAssistantReady) {
+function Invoke-WithLauncherMutex {
+    param([scriptblock]$Action)
+
+    $Identity = "$([System.IO.Path]::GetFullPath($Root).ToLowerInvariant())|$Port"
+    $Hasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $HashBytes = $Hasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Identity))
+    } finally {
+        $Hasher.Dispose()
+    }
+    $Hash = [System.BitConverter]::ToString($HashBytes).Replace('-', '')
+    $Mutex = [System.Threading.Mutex]::new($false, "Local\SemiconductorReview-$Hash")
+    $Acquired = $false
+    try {
+        try {
+            $Acquired = $Mutex.WaitOne(120000)
+        } catch [System.Threading.AbandonedMutexException] {
+            $Acquired = $true
+        }
+        if (-not $Acquired) {
+            throw '另一个启动或停止操作长时间未完成，请稍后重试。'
+        }
+        & $Action
+    } finally {
+        if ($Acquired) {
+            $Mutex.ReleaseMutex()
+        }
+        $Mutex.Dispose()
+    }
+}
+
+Invoke-WithLauncherMutex {
+$Readiness = Get-ReviewAssistantReadiness
+if ($Readiness -eq 'current' -or ($Readiness -eq 'legacy' -and (Test-VerifiedRunnerListener))) {
     if (-not $NoBrowser) {
         Start-Process $Url
     }
@@ -83,6 +150,9 @@ if (Test-LauncherPortInUse) {
 if (-not (Test-Path -LiteralPath $PythonPath) -or -not (Test-Path -LiteralPath $FrontendIndex)) {
     Write-Host '检测到尚未完成安装，先运行初始化。' -ForegroundColor Yellow
     & $Setup
+    if (-not (Test-Path -LiteralPath $PythonPath) -or -not (Test-Path -LiteralPath $FrontendIndex)) {
+        throw '初始化未生成完整的 Python 环境或网页文件，请重新运行 setup.ps1 查看错误。'
+    }
 }
 
 New-Item -ItemType Directory -Path $RuntimeDir -Force | Out-Null
@@ -118,11 +188,11 @@ Set-Content -LiteralPath $PidFile -Value $Server.Id -Encoding Ascii
 $Ready = $false
 for ($Attempt = 0; $Attempt -lt 40; $Attempt++) {
     Start-Sleep -Milliseconds 250
-    if (Test-ReviewAssistantReady) {
-        $Ready = $true
+    if ($Server.HasExited) {
         break
     }
-    if ($Server.HasExited) {
+    if ((Get-ReviewAssistantReadiness) -eq 'current') {
+        $Ready = $true
         break
     }
 }
@@ -147,3 +217,4 @@ if (-not $NoBrowser) {
     Start-Process $Url
 }
 Write-Host "半导体复习台已启动：$Url" -ForegroundColor Green
+}

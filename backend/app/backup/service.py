@@ -11,6 +11,8 @@ from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from app.shared.errors import AppError
 
+_EXCLUDED_DATA_DIRECTORIES = {"backups", "restore-staged", "codex-provider", "runtime"}
+
 
 class InvalidBackupError(AppError):
     def __init__(self, message: str = "The backup archive is invalid."):
@@ -29,12 +31,11 @@ def _safe_archive_name(name: str) -> bool:
 
 
 def _data_files(data_dir: Path) -> list[Path]:
-    excluded = {"backups", "restore-staged", "codex-provider"}
     return sorted(
         path
         for path in data_dir.rglob("*")
         if path.is_file()
-        and not excluded.intersection(path.relative_to(data_dir).parts)
+        and not _EXCLUDED_DATA_DIRECTORIES.intersection(path.relative_to(data_dir).parts)
         and not path.name.endswith(("-wal", "-shm", "-journal"))
     )
 
@@ -126,6 +127,8 @@ def restore_backup(content: bytes, data_dir: Path, engine) -> dict:
                 if not name.startswith("data/") or name.endswith("/"):
                     continue
                 relative = PurePosixPath(name).relative_to("data")
+                if _EXCLUDED_DATA_DIRECTORIES.intersection(relative.parts):
+                    continue
                 target = stage.joinpath(*relative.parts)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(archive.read(name))
@@ -143,7 +146,7 @@ def restore_backup(content: bytes, data_dir: Path, engine) -> dict:
             key=lambda path: len(path.parts),
             reverse=True,
         ):
-            if directory.name not in {"backups", "restore-staged"}:
+            if directory.name not in _EXCLUDED_DATA_DIRECTORIES:
                 try:
                     directory.rmdir()
                 except OSError:

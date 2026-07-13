@@ -88,7 +88,12 @@ def create_app(
         try:
             with app.state.database.connect() as connection:
                 connection.execute(text("SELECT 1"))
-            return {"status": "ok", "checks": {"database": "ok"}}
+            return {
+                "application": "semiconductor-review-assistant",
+                "protocol_version": 1,
+                "status": "ok",
+                "checks": {"database": "ok"},
+            }
         except Exception as error:
             raise HTTPException(status_code=503, detail="Database is unavailable.") from error
 

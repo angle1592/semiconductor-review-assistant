@@ -44,49 +44,84 @@ function Get-ListenerProcessId {
     return $null
 }
 
-$LauncherId = $null
-if (Test-Path -LiteralPath $PidFile) {
-    $ParsedId = 0
-    if ([int]::TryParse((Get-Content -LiteralPath $PidFile -Raw).Trim(), [ref]$ParsedId)) {
-        if ($null -ne (Get-VerifiedRunnerProcess $ParsedId)) {
-            $LauncherId = $ParsedId
-        }
-    }
-}
+function Invoke-WithLauncherMutex {
+    param([scriptblock]$Action)
 
-if ($null -ne $LauncherId) {
-    Set-Content -LiteralPath $StopFile -Value 'stop' -Encoding Ascii
+    $Identity = "$([System.IO.Path]::GetFullPath($Root).ToLowerInvariant())|$Port"
+    $Hasher = [System.Security.Cryptography.SHA256]::Create()
     try {
-        $Launcher = [System.Diagnostics.Process]::GetProcessById($LauncherId)
-        $null = $Launcher.WaitForExit(8000)
-    } catch {
-        # The process may have exited between validation and waiting.
+        $HashBytes = $Hasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Identity))
+    } finally {
+        $Hasher.Dispose()
+    }
+    $Hash = [System.BitConverter]::ToString($HashBytes).Replace('-', '')
+    $Mutex = [System.Threading.Mutex]::new($false, "Local\SemiconductorReview-$Hash")
+    $Acquired = $false
+    try {
+        try {
+            $Acquired = $Mutex.WaitOne(120000)
+        } catch [System.Threading.AbandonedMutexException] {
+            $Acquired = $true
+        }
+        if (-not $Acquired) {
+            throw '另一个启动或停止操作长时间未完成，请稍后重试。'
+        }
+        & $Action
+    } finally {
+        if ($Acquired) {
+            $Mutex.ReleaseMutex()
+        }
+        $Mutex.Dispose()
     }
 }
 
-for ($Attempt = 0; $Attempt -lt 20; $Attempt++) {
+Invoke-WithLauncherMutex {
+$ListenerId = Get-ListenerProcessId
+if ($null -eq $ListenerId) {
+    Remove-Item -LiteralPath $PidFile, $StopFile -Force -ErrorAction SilentlyContinue
+    Write-Host "端口 $Port 上没有正在运行的半导体复习台。" -ForegroundColor Yellow
+    return
+}
+
+$Listener = Get-VerifiedRunnerProcess $ListenerId
+if ($null -eq $Listener) {
+    throw "端口 $Port 由其他程序占用，停止脚本不会结束它。"
+}
+
+$SafeParentId = $null
+$Parent = Get-VerifiedRunnerProcess $Listener.ParentProcessId
+if ($null -ne $Parent) {
+    $SafeParentId = [int]$Parent.ProcessId
+}
+
+Set-Content -LiteralPath $StopFile -Value 'stop' -Encoding Ascii
+for ($Attempt = 0; $Attempt -lt 40; $Attempt++) {
     if ($null -eq (Get-ListenerProcessId)) {
         break
     }
     Start-Sleep -Milliseconds 200
 }
 
-$ListenerId = Get-ListenerProcessId
-if ($null -ne $ListenerId) {
-    $Listener = Get-VerifiedRunnerProcess $ListenerId
-    if ($null -eq $Listener) {
+$RemainingListenerId = Get-ListenerProcessId
+if ($null -ne $RemainingListenerId) {
+    $RemainingListener = Get-VerifiedRunnerProcess $RemainingListenerId
+    if ($null -eq $RemainingListener) {
         throw "端口 $Port 由其他程序占用，停止脚本不会结束它。"
     }
-    Stop-Process -Id $ListenerId -Force
-    $Parent = Get-VerifiedRunnerProcess $Listener.ParentProcessId
-    if ($null -ne $Parent) {
-        Stop-Process -Id $Parent.ProcessId -Force -ErrorAction SilentlyContinue
-    }
+    Stop-Process -Id $RemainingListenerId -Force
 }
 
-if ($null -ne $LauncherId) {
-    Stop-Process -Id $LauncherId -Force -ErrorAction SilentlyContinue
+if ($null -ne $SafeParentId) {
+    for ($Attempt = 0; $Attempt -lt 10; $Attempt++) {
+        if ($null -eq (Get-VerifiedRunnerProcess $SafeParentId)) {
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    if ($null -ne (Get-VerifiedRunnerProcess $SafeParentId)) {
+        Stop-Process -Id $SafeParentId -Force -ErrorAction SilentlyContinue
+    }
 }
 Remove-Item -LiteralPath $PidFile, $StopFile -Force -ErrorAction SilentlyContinue
 Write-Host '半导体复习台已停止。' -ForegroundColor Green
-
+}

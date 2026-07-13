@@ -24,6 +24,8 @@ def test_ready_cors_security_headers_and_spa_hosting(tmp_path: Path):
         )
 
     assert ready.status_code == 200
+    assert ready.json()["application"] == "semiconductor-review-assistant"
+    assert ready.json()["protocol_version"] == 1
     assert ready.json()["checks"]["database"] == "ok"
     assert "本地复习台" in page.text
     assert page.headers["x-content-type-options"] == "nosniff"
