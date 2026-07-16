@@ -1,78 +1,64 @@
-# 回片：半导体课后复习台
+# 拾要
 
-一个本地优先的课后复习助手：导入培训课件，选择当天页面，用 10～15 分钟完成主动回忆、纠错、自评和间隔复习。
+拾要是一款本地优先的总复习工作台。目标是导入 PPT、Word 等复习资料，由使用者直接说明“什么最重要”，或把这套标准交给第三方 AI，用它整理重点并支持后续复习。
 
-普通使用者请从 [GitHub Releases](https://github.com/angle1592/semiconductor-review-assistant/releases) 下载 Windows 安装包，无需安装 Python 或 Node。安装前请按同名 SHA256 文件校验摘要。下面的 PowerShell 方式只用于源码开发。
+## 当前阶段
 
-## Windows 快速开始
+当前代码处于 Phase 1 基础阶段，只交付以下真实能力：
 
-首次运行：
+- 全新的拾要产品身份、本机数据目录与独立数据库；
+- 复习项目的新建、查看、编辑和删除；
+- 项目内“概览、资料、重点、复习、掌握情况”五步工作区；
+- OpenAI 兼容接口的临时基础配置入口；
+- 清楚的加载、空状态、失败提示和响应式页面。
+
+以下能力尚未完成，请不要把当前界面中的流程位置当成可用功能：
+
+- 成熟的第三方服务商预设、连接诊断、模型列表获取与模型选择；
+- PPT、PPTX、DOC、DOCX 等资料导入和文本/图片提取；
+- 由用户规则或 AI 识别重点，以及结果缓存和重新分析；
+- 重点确认、题目生成、正式复习和掌握情况统计；
+- 新身份下的 Windows 安装包、快捷方式和发布流程。
+
+这些能力会分别在后续 Provider、资料分析、复习与发布阶段接入。
+
+## 开发运行
+
+后端需要 Python 3.12，前端需要 Node.js 与 npm。
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\setup.ps1
-.\install-shortcut.ps1
-```
-
-以后直接双击桌面的“半导体复习台”快捷方式即可；也可以手动运行：
-
-```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+cd ..\frontend
+npm ci
+npm run build
+cd ..
 .\start.ps1
 ```
 
-启动脚本会在后台运行本地服务并打开 `http://127.0.0.1:8000`。再次启动会复用已有服务并重新打开浏览器，不再报端口冲突。关闭浏览器不会停止服务；需要完全停止时运行：
+本机服务默认打开 `http://127.0.0.1:8000`。停止服务：
 
 ```powershell
 .\stop.ps1
 ```
 
-停止脚本只会结束本项目在端口 8000 上的服务，并会先让服务安全释放 SQLite。
-
-## 使用顺序
-
-1. 在“课程”中新建课程。
-2. 进入课程，上传 PDF、PPT 或 PPTX；PPT需要本机安装 Microsoft PowerPoint。
-3. 在“设置”中选择 OpenAI兼容 API或 Codex SDK，并测试连接。
-4. 从课程页选择课件，记录当天页面和课堂重点。
-5. 生成题目后进入十分钟复习；坏题和跳过题不会影响掌握度。
-6. 定期从“设置”导出不含 API Key的 ZIP备份。
-
-## 数据与隐私
-
-- 正式数据保存在项目根目录的 `data/`，SQLite是唯一主数据。
-- OpenAI兼容 API Key保存在 Windows凭据存储中，不进入数据库或备份。
-- 只有你选中的课件页面、提取文字和课堂补充会发送给当前 AI后端。
-- 两个 AI后端只会手动切换，失败时不会自动转发。
-
-## 开发命令
-
-后端：
+## 验证
 
 ```powershell
 cd backend
 .\.venv\Scripts\python.exe -m pytest
 .\.venv\Scripts\python.exe -m ruff check app tests
-```
-
-前端：
-
-```powershell
-cd frontend
+cd ..\frontend
 npm test
-npm run build
 npm run lint
+npm run build
 npm run test:e2e
 ```
 
-浏览器端到端测试默认使用本机已安装的 Google Chrome，不额外下载浏览器。
+## 数据与隐私边界
 
-构建 Windows 独立应用：
-
-```powershell
-.\scripts\build-windows.ps1
-.\scripts\verify-frozen-app.ps1
-```
-
-## 第一版边界
-
-不包含账户系统、双向云同步、手机写入、OCR、自动控制 NotebookLM、排行榜或完整半导体百科。NotebookLM内容通过 Markdown/TXT原文导入。
+- 项目数据以 SQLite 保存在本机，不包含账户或云同步。
+- API Key 使用 Windows 凭据存储，不写入数据库、日志或备份。
+- 当前阶段不会上传学习资料，因为资料导入与分析尚未实现。
+- 后续只有在用户明确发起分析时，所选资料内容才会发送给当前配置的第三方 AI。

@@ -141,7 +141,7 @@ class OpenAICompatibleProvider:
             "messages": [
                 {
                     "role": "system",
-                    "content": "你是半导体课程复习助手。严格依据输入来源并输出指定 JSON。",
+                    "content": "你是总复习资料整理助手。严格依据输入来源和用户的重点标准，并输出指定 JSON。",
                 },
                 {"role": "user", "content": content if images else prompt},
             ],

@@ -11,10 +11,10 @@ $ErrorActionPreference = 'Stop'
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Backend = Join-Path $Root 'backend'
-$FrontendDist = if ([string]::IsNullOrWhiteSpace($env:SEMIREVIEW_FRONTEND_DIST)) {
+$FrontendDist = if ([string]::IsNullOrWhiteSpace($env:SHIYAO_FRONTEND_DIST)) {
     Join-Path $Root 'frontend\dist'
 } else {
-    $env:SEMIREVIEW_FRONTEND_DIST
+    $env:SHIYAO_FRONTEND_DIST
 }
 $FrontendIndex = Join-Path $FrontendDist 'index.html'
 $Setup = Join-Path $Root 'setup.ps1'
@@ -44,8 +44,8 @@ function Get-ReviewAssistantReadiness {
             return 'none'
         }
         if (
-            $Response.application -eq 'semiconductor-review-assistant' -and
-            $Response.protocol_version -eq 1
+            $Response.application -eq 'shiyao-review' -and
+            $Response.protocol_version -eq 2
         ) {
             return 'current'
         }
@@ -162,15 +162,15 @@ $OutputLog = Join-Path $RuntimeDir 'server.stdout.log'
 $ErrorLog = Join-Path $RuntimeDir 'server.stderr.log'
 Remove-Item -LiteralPath $PidFile, $StopFile -Force -ErrorAction SilentlyContinue
 
-$HadStopFile = Test-Path Env:SEMIREVIEW_STOP_FILE
-$PreviousStopFile = $env:SEMIREVIEW_STOP_FILE
-$HadPort = Test-Path Env:SEMIREVIEW_PORT
-$PreviousPort = $env:SEMIREVIEW_PORT
+$HadStopFile = Test-Path Env:SHIYAO_STOP_FILE
+$PreviousStopFile = $env:SHIYAO_STOP_FILE
+$HadPort = Test-Path Env:SHIYAO_PORT
+$PreviousPort = $env:SHIYAO_PORT
 $Server = $null
 
 try {
-    $env:SEMIREVIEW_STOP_FILE = $StopFile
-    $env:SEMIREVIEW_PORT = [string]$Port
+    $env:SHIYAO_STOP_FILE = $StopFile
+    $env:SHIYAO_PORT = [string]$Port
     $Server = Start-Process -FilePath $PythonPath `
         -ArgumentList @('-m', 'app.runner') `
         -WorkingDirectory $Backend `
@@ -179,8 +179,8 @@ try {
         -RedirectStandardError $ErrorLog `
         -PassThru
 } finally {
-    Restore-EnvironmentValue 'SEMIREVIEW_STOP_FILE' $HadStopFile $PreviousStopFile
-    Restore-EnvironmentValue 'SEMIREVIEW_PORT' $HadPort $PreviousPort
+    Restore-EnvironmentValue 'SHIYAO_STOP_FILE' $HadStopFile $PreviousStopFile
+    Restore-EnvironmentValue 'SHIYAO_PORT' $HadPort $PreviousPort
 }
 
 Set-Content -LiteralPath $PidFile -Value $Server.Id -Encoding Ascii

@@ -42,7 +42,7 @@ export function ProjectsPage() {
 
       {projects.isPending && <LoadingState label="正在读取项目" />}
       {projects.isError && <ErrorState title="项目暂时无法读取" description="请确认本机服务正在运行，然后重试。" onRetry={() => void projects.refetch()} />}
-      {projects.data?.length === 0 && <EmptyState title="还没有复习项目" description="先写下这次要复习什么，以及你认为哪些内容最重要。" actionLabel="新建复习项目" onAction={() => setCreating(true)} />}
+      {projects.data?.length === 0 && <EmptyState title="还没有复习项目" description="点击页面右上角的新建按钮，写下这次要复习什么，以及你认为哪些内容最重要。" />}
       {projects.data && projects.data.length > 0 && (
         <div className="project-index">
           {projects.data.map((project, index) => (

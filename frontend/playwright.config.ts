@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const frontendDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(frontendDir, '..')
 const backendDir = path.join(projectRoot, 'backend')
-const pythonExecutable = process.env.SEMIREVIEW_PYTHON ?? (process.platform === 'win32'
+const pythonExecutable = process.env.SHIYAO_PYTHON ?? (process.platform === 'win32'
   ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
   : path.join(backendDir, '.venv', 'bin', 'python'))
 const baseURL = 'http://127.0.0.1:8765'
@@ -36,8 +36,8 @@ export default defineConfig({
     command: `"${pythonExecutable}" -m uvicorn app.main:create_default_app --factory --host 127.0.0.1 --port 8765`,
     cwd: backendDir,
     env: {
-      SEMIREVIEW_DATA_DIR: path.join(tmpdir(), `semiconductor-review-e2e-${process.pid}-${Date.now()}`),
-      SEMIREVIEW_FRONTEND_DIST: path.join(frontendDir, 'dist'),
+      SHIYAO_DATA_DIR: path.join(tmpdir(), `shiyao-review-e2e-${process.pid}-${Date.now()}`),
+      SHIYAO_FRONTEND_DIST: path.join(frontendDir, 'dist'),
     },
     url: `${baseURL}/ready`,
     reuseExistingServer: false,
