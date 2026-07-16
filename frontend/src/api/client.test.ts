@@ -44,13 +44,15 @@ describe('project API client', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
-      json: async () => ({ code: 'NOT_FOUND', message: '项目不存在' }),
+      json: async () => ({ code: 'NOT_FOUND', message: '项目不存在', action: 'open_project_index', context: { project_id: 'missing' } }),
     }))
 
     await expect(api.getProject('missing')).rejects.toMatchObject({
       status: 404,
       code: 'NOT_FOUND',
       message: '项目不存在',
+      action: 'open_project_index',
+      context: { project_id: 'missing' },
     })
   })
 })

@@ -8,7 +8,7 @@ import { AppRoutes } from '../App'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('creates a review project and opens its five-tab workspace', async () => {
+it('creates a review project and opens its six-step workspace', async () => {
   const user = userEvent.setup()
   const project = {
     id: 'project-1',
@@ -45,7 +45,7 @@ it('creates a review project and opens its five-tab workspace', async () => {
   await user.click(screen.getByRole('button', { name: '创建项目' }))
 
   expect(await screen.findByRole('heading', { name: '期末总复习' })).toBeInTheDocument()
-  for (const tab of ['概览', '资料', '重点', '复习', '掌握情况']) {
+  for (const tab of ['概览', '资料', '分析', '重点', '复习', '掌握情况']) {
     expect(screen.getByRole('tab', { name: tab })).toBeInTheDocument()
   }
 })

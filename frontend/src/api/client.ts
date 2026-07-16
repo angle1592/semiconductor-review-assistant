@@ -62,22 +62,26 @@ export type SystemInfo = {
 export class ApiError extends Error {
   status: number
   code?: string
+  action?: string
+  context?: Record<string, unknown>
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, action?: string, context?: Record<string, unknown>) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.action = action
+    this.context = context
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
   if (!response.ok) {
-    let problem: { detail?: string; message?: string; code?: string } = {}
+    let problem: { detail?: string; message?: string; code?: string; action?: string; context?: Record<string, unknown> } = {}
     try {
       problem = await response.json()
     } catch {
@@ -87,6 +91,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       problem.message ?? problem.detail ?? `请求失败（${response.status}）`,
       response.status,
       problem.code,
+      problem.action,
+      problem.context,
     )
   }
   if (response.status === 204) return undefined as T

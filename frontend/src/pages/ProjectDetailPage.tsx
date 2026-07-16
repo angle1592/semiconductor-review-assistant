@@ -1,23 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { api, type ReviewProjectInput } from '../api/client'
 import { ErrorState, LoadingState, PageHeading } from '../components/Ui'
+import { AnalysisPage } from './project/AnalysisPage'
+import { KeyPointsPage } from './project/KeyPointsPage'
+import { MaterialsPage } from './project/MaterialsPage'
 
 const tabs = [
   { label: '概览', number: '01' },
   { label: '资料', number: '02' },
-  { label: '重点', number: '03' },
-  { label: '复习', number: '04' },
-  { label: '掌握情况', number: '05' },
+  { label: '分析', number: '03' },
+  { label: '重点', number: '04' },
+  { label: '复习', number: '05' },
+  { label: '掌握情况', number: '06' },
 ]
 
 export function ProjectDetailPage() {
   const { projectId = '' } = useParams()
   const [activeTab, setActiveTab] = useState('概览')
   const [draft, setDraft] = useState<ReviewProjectInput | null>(null)
+  const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([])
+  const [activeRunId, setActiveRunId] = useState<number | null>(null)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const project = useQuery({ queryKey: ['project', projectId], queryFn: () => api.getProject(projectId), enabled: Boolean(projectId) })
@@ -64,10 +70,13 @@ export function ProjectDetailPage() {
             <label>项目说明<textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
             <label>什么内容最重要<textarea value={draft.importance_prompt} onChange={(event) => setDraft({ ...draft, importance_prompt: event.target.value })} placeholder="可以由你直接说明，也可以作为 AI 判断重点的提示词。" /></label>
             {updateProject.isSuccess && <p className="form-success" role="status">项目设置已保存。</p>}
-            <div className="danger-zone"><div><strong>删除项目</strong><p>当前阶段只会删除项目定义。后续资料也会随项目一起删除。</p></div><button className="button button--danger" type="button" onClick={() => window.confirm('确认删除这个复习项目？') && deleteProject.mutate()}><Trash2 /> 删除</button></div>
+            <div className="danger-zone"><div><strong>删除项目</strong><p>将同时删除项目资料、解析内容、分析任务、候选重点与正式重点，且无法撤销。</p></div><button className="button button--danger" type="button" onClick={() => window.confirm('确认删除这个复习项目及全部关联数据？') && deleteProject.mutate()}><Trash2 /> 删除</button></div>
           </form>
         )}
-        {activeTab !== '概览' && (
+        {activeTab === '资料' && <MaterialsPage projectId={projectId} selectedBlockIds={selectedBlockIds} onSelectedBlockIdsChange={setSelectedBlockIds} />}
+        {activeTab === '分析' && <AnalysisPage project={project.data} selectedBlockIds={selectedBlockIds} activeRunId={activeRunId} onActiveRunIdChange={setActiveRunId} />}
+        {activeTab === '重点' && <KeyPointsPage projectId={projectId} activeRunId={activeRunId} onOpenSourceBlock={(blockId) => { setSelectedBlockIds((ids) => ids.includes(blockId) ? ids : [...ids, blockId]); setActiveTab('资料') }} />}
+        {(activeTab === '复习' || activeTab === '掌握情况') && (
           <div className="step-placeholder"><span>{tabs.find((tab) => tab.label === activeTab)?.number}</span><h2>{activeTab}能力将在下一阶段接通</h2><p>此处现在只展示流程位置，不会伪造处理结果或掌握数据。</p></div>
         )}
       </div>
