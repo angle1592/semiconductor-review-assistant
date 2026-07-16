@@ -7,34 +7,20 @@ import { AppRoutes } from '../App'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('shows only third-party API configuration', async () => {
+it('lists multiple third-party services and their validation state', async () => {
+  const provider = { id: 'p1', name: '主力服务', protocol: 'anthropic', base_url: 'https://relay.test/v1', enabled: true, is_default: true, credential_generation: 1, api_key_configured: true, models_fetched_at: null, created_at: '2026-07-16T12:00:00Z', updated_at: '2026-07-16T12:00:00Z' }
+  const model = { id: 'm1', provider_id: 'p1', model_id: 'claude-test', display_name: 'Claude Test', text_status: 'passed', structured_status: 'passed', vision_status: 'passed', prompt_cache_status: 'passed', safe_error_code: null, validated_at: '2026-07-16T12:00:00Z' }
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input)
-    if (url.endsWith('/api/settings/ai')) {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          provider: 'openai_compatible',
-          base_url: 'https://api.example/v1',
-          model: 'review-model',
-          api_key_configured: true,
-          vision_enabled: true,
-        }),
-      }
-    }
-    if (url.endsWith('/api/system/info')) {
-      return { ok: true, status: 200, json: async () => ({ application: 'shiyao-review', version: '0.1.0', packaged: false, setup_complete: true, data_directory: 'data', log_directory: 'logs' }) }
-    }
+    if (url.endsWith('/api/providers')) return { ok: true, status: 200, json: async () => [provider] }
+    if (url.endsWith('/api/providers/p1/models')) return { ok: true, status: 200, json: async () => [model] }
+    if (url.endsWith('/api/system/info')) return { ok: true, status: 200, json: async () => ({ application: 'shiyao-review', version: '0.1.0', packaged: false, setup_complete: true, data_directory: 'data', log_directory: 'logs' }) }
     throw new Error(`Unexpected request: ${url}`)
   }))
 
-  render(
-    <MemoryRouter initialEntries={['/settings']}>
-      <AppRoutes />
-    </MemoryRouter>,
-  )
-
+  render(<MemoryRouter initialEntries={['/settings']}><AppRoutes /></MemoryRouter>)
   expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument()
-  expect(screen.getByText('OpenAI 兼容 API')).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: '主力服务' })).toBeInTheDocument()
+  expect(screen.getByText('视觉：通过')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '新增服务' })).toBeInTheDocument()
 })

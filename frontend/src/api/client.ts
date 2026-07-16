@@ -17,23 +17,37 @@ export type ReviewProject = {
 
 export type ReviewProjectInput = Pick<ReviewProject, 'name' | 'description' | 'importance_prompt'>
 
-export type AISettings = {
-  provider: 'openai_compatible'
+export type ProviderProtocol = 'openai_compatible' | 'anthropic'
+
+export type ProviderProfile = {
+  id: string
+  name: string
+  protocol: ProviderProtocol
   base_url: string
-  model: string
-  api_key_configured?: boolean
-  vision_enabled: boolean
+  enabled: boolean
+  is_default: boolean
+  credential_generation: number
+  api_key_configured: boolean
+  models_fetched_at: string | null
+  created_at: string
+  updated_at: string
 }
 
-export type AISettingsInput = AISettings & {
+export type ProviderProfileInput = Pick<ProviderProfile, 'name' | 'protocol' | 'base_url'> & {
   api_key?: string
-  clear_api_key?: boolean
 }
 
-export type ConnectionTestResult = {
-  ok: boolean
-  message?: string
-  capabilities?: string[]
+export type ModelProfile = {
+  id: string
+  provider_id: string
+  model_id: string
+  display_name: string
+  text_status: string
+  structured_status: string
+  vision_status: string
+  prompt_cache_status: string
+  safe_error_code: string | null
+  validated_at: string | null
 }
 
 export type SystemInfo = {
@@ -96,11 +110,18 @@ export const api = {
     request<ReviewProject>(`/api/projects/${projectId}`, { method: 'PATCH', body: json(payload) }),
   deleteProject: (projectId: string) =>
     request<void>(`/api/projects/${projectId}`, { method: 'DELETE' }),
-  getAISettings: () => request<AISettings>('/api/settings/ai'),
-  saveAISettings: (payload: AISettingsInput) =>
-    request<AISettings>('/api/settings/ai', { method: 'PUT', body: json(payload) }),
-  testAISettings: (payload: AISettingsInput) =>
-    request<ConnectionTestResult>('/api/settings/ai/test', { method: 'POST', body: json(payload) }),
+  listProviders: () => request<ProviderProfile[]>('/api/providers'),
+  getProvider: (providerId: string) => request<ProviderProfile>(`/api/providers/${providerId}`),
+  createProvider: (payload: ProviderProfileInput) => request<ProviderProfile>('/api/providers', { method: 'POST', body: json(payload) }),
+  updateProvider: (providerId: string, payload: Partial<ProviderProfileInput>) => request<ProviderProfile>(`/api/providers/${providerId}`, { method: 'PATCH', body: json(payload) }),
+  deleteProvider: (providerId: string) => request<void>(`/api/providers/${providerId}`, { method: 'DELETE' }),
+  listModels: (providerId: string) => request<ModelProfile[]>(`/api/providers/${providerId}/models`),
+  refreshModels: (providerId: string, force = false) => request<ModelProfile[]>(`/api/providers/${providerId}/models:refresh${force ? '?force=true' : ''}`, { method: 'POST' }),
+  addModel: (providerId: string, payload: { model_id: string; display_name: string }) => request<ModelProfile>(`/api/providers/${providerId}/models`, { method: 'POST', body: json(payload) }),
+  probeModel: (providerId: string, modelProfileId: string) => request<ModelProfile>(`/api/providers/${providerId}/models/${modelProfileId}:probe`, { method: 'POST' }),
+  enableProvider: (providerId: string) => request<ProviderProfile>(`/api/providers/${providerId}:enable`, { method: 'POST' }),
+  disableProvider: (providerId: string) => request<ProviderProfile>(`/api/providers/${providerId}:disable`, { method: 'POST' }),
+  setDefaultProvider: (providerId: string) => request<ProviderProfile>(`/api/providers/${providerId}:default`, { method: 'POST' }),
   exportBackup: () => requestBlob('/api/backups/export'),
   restoreBackup: (file: File) => {
     const form = new FormData()
