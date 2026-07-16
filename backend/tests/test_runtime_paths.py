@@ -6,8 +6,8 @@ from app.runtime.paths import AppPaths
 def test_discover_respects_explicit_development_paths(monkeypatch, tmp_path: Path):
     data_dir = tmp_path / "test-data"
     frontend_dir = tmp_path / "web"
-    monkeypatch.setenv("SEMIREVIEW_DATA_DIR", str(data_dir))
-    monkeypatch.setenv("SEMIREVIEW_FRONTEND_DIST", str(frontend_dir))
+    monkeypatch.setenv("SHIYAO_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("SHIYAO_FRONTEND_DIST", str(frontend_dir))
 
     paths = AppPaths.discover(frozen=False, project_root=tmp_path / "project")
 
@@ -15,16 +15,17 @@ def test_discover_respects_explicit_development_paths(monkeypatch, tmp_path: Pat
     assert paths.frontend_dist == frontend_dir.resolve()
 
 
-def test_frozen_app_uses_local_app_data_and_bundled_frontend(monkeypatch, tmp_path: Path):
+def test_frozen_app_uses_shiyao_user_root(monkeypatch, tmp_path: Path):
     local_app_data = tmp_path / "Local"
     bundle = tmp_path / "bundle"
     monkeypatch.setenv("LOCALAPPDATA", str(local_app_data))
-    monkeypatch.delenv("SEMIREVIEW_DATA_DIR", raising=False)
-    monkeypatch.delenv("SEMIREVIEW_FRONTEND_DIST", raising=False)
+    monkeypatch.delenv("SHIYAO_ROOT", raising=False)
+    monkeypatch.delenv("SHIYAO_DATA_DIR", raising=False)
+    monkeypatch.delenv("SHIYAO_FRONTEND_DIST", raising=False)
 
     paths = AppPaths.discover(frozen=True, resource_root=bundle)
 
-    assert paths.root == (local_app_data / "SemiconductorReview").resolve()
+    assert paths.root == (local_app_data / "Shiyao").resolve()
     assert paths.data == (paths.root / "Data")
     assert paths.backups == (paths.root / "Backups")
     assert paths.logs == (paths.root / "Logs")

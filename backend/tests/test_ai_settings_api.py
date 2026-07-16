@@ -43,7 +43,7 @@ def test_ai_settings_persist_without_leaking_api_key(tmp_path: Path) -> None:
             json={
                 "provider": "openai_compatible",
                 "base_url": "https://models.example/v1",
-                "model": "semiconductor-vision",
+                "model": "review-vision",
                 "vision_enabled": True,
                 "api_key": "super-secret-api-key",
             },
@@ -71,12 +71,12 @@ def test_ai_settings_persist_without_leaking_api_key(tmp_path: Path) -> None:
     assert selected == [("openai_compatible", "super-secret-api-key")]
     assert secrets.get("openai_compatible_api_key") == "super-secret-api-key"
 
-    with sqlite3.connect(tmp_path / "review.db") as connection:
+    with sqlite3.connect(tmp_path / "shiyao.db") as connection:
         columns = {
             row[1] for row in connection.execute("PRAGMA table_info(ai_settings)").fetchall()
         }
     assert "api_key" not in columns
-    assert "super-secret-api-key".encode() not in (tmp_path / "review.db").read_bytes()
+    assert "super-secret-api-key".encode() not in (tmp_path / "shiyao.db").read_bytes()
 
 
 def test_ai_test_uses_unsaved_key_without_persisting_it(tmp_path: Path) -> None:

@@ -21,6 +21,7 @@ from app.desktop.windows_session import WindowsSessionMonitor
 from app.main import create_app
 from app.runtime.migrations import migrate_database
 from app.runtime.paths import AppPaths
+from app.runtime.identity import DATABASE_NAME
 from app.system.service import configure_file_logging, is_setup_complete
 
 
@@ -104,7 +105,7 @@ def launch(
             browser_open(f"{existing.base_url}/")
             return 0
 
-        database_path = resolved_paths.data / "review.db"
+        database_path = resolved_paths.data / DATABASE_NAME
         first_run = not is_setup_complete(resolved_paths.data)
         migrate_database(database_path, resolved_paths.backups)
         app = create_app(

@@ -22,6 +22,7 @@ from app.shared.database import create_database
 from app.shared.errors import AppError, app_error_handler, unexpected_error_handler
 from app.shared.request_id import RequestIdMiddleware
 from app.runtime.migrations import migrate_database
+from app.runtime.identity import APPLICATION_ID, DATABASE_NAME, PROTOCOL_VERSION
 from app.runtime.paths import AppPaths
 from app.system.router import router as system_router
 
@@ -46,7 +47,7 @@ def create_app(
         finally:
             application.state.database.dispose()
 
-    app = FastAPI(title="Semiconductor Review Assistant", lifespan=lifespan)
+    app = FastAPI(title="Shiyao Review", lifespan=lifespan)
     app.state.data_dir = resolved_data_dir
     app.state.paths = AppPaths(
         root=resolved_data_dir.parent,
@@ -121,8 +122,8 @@ def create_app(
             with app.state.database.connect() as connection:
                 connection.execute(text("SELECT 1"))
             return {
-                "application": "semiconductor-review-assistant",
-                "protocol_version": 1,
+                "application": APPLICATION_ID,
+                "protocol_version": PROTOCOL_VERSION,
                 "status": "ok",
                 "checks": {"database": "ok"},
             }
@@ -150,7 +151,7 @@ def create_app(
 def create_default_app() -> FastAPI:
     paths = AppPaths.discover()
     paths.ensure_directories()
-    migrate_database(paths.data / "review.db", paths.backups)
+    migrate_database(paths.data / DATABASE_NAME, paths.backups)
     app = create_app(data_dir=paths.data, frontend_dist_dir=paths.frontend_dist)
     app.state.paths = paths
     return app

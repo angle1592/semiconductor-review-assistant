@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/backups", tags=["backups"])
 @router.get("/export")
 def export_backup(request: Request) -> StreamingResponse:
     content = create_backup(request.app.state.data_dir)
-    headers = {"Content-Disposition": 'attachment; filename="semiconductor-review-backup.zip"'}
+    headers = {"Content-Disposition": 'attachment; filename="shiyao-backup.zip"'}
     return StreamingResponse(BytesIO(content), media_type="application/zip", headers=headers)
 
 

@@ -24,8 +24,8 @@ def test_ready_cors_security_headers_and_spa_hosting(tmp_path: Path):
         )
 
     assert ready.status_code == 200
-    assert ready.json()["application"] == "semiconductor-review-assistant"
-    assert ready.json()["protocol_version"] == 1
+    assert ready.json()["application"] == "shiyao-review"
+    assert ready.json()["protocol_version"] == 2
     assert ready.json()["checks"]["database"] == "ok"
     assert "本地复习台" in page.text
     assert page.headers["x-content-type-options"] == "nosniff"
@@ -66,7 +66,7 @@ def test_local_runner_honors_the_graceful_stop_file(tmp_path: Path, monkeypatch)
                 time.sleep(0.01)
             seen["stopped"] = self.should_exit
 
-    monkeypatch.setenv("SEMIREVIEW_STOP_FILE", str(stop_file))
+    monkeypatch.setenv("SHIYAO_STOP_FILE", str(stop_file))
     monkeypatch.setattr(runner, "create_default_app", lambda: object())
     monkeypatch.setattr(runner.uvicorn, "Config", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(runner.uvicorn, "Server", FakeServer)

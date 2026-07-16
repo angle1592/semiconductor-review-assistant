@@ -81,8 +81,8 @@ def _launcher_environment(tmp_path: Path) -> dict[str, str]:
     frontend_dist.mkdir()
     (frontend_dist / "index.html").write_text("<!doctype html>", encoding="utf-8")
     env = os.environ.copy()
-    env["SEMIREVIEW_DATA_DIR"] = str(tmp_path / "data")
-    env["SEMIREVIEW_FRONTEND_DIST"] = str(frontend_dist)
+    env["SHIYAO_DATA_DIR"] = str(tmp_path / "data")
+    env["SHIYAO_FRONTEND_DIST"] = str(frontend_dist)
     return env
 
 

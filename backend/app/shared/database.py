@@ -2,10 +2,14 @@ from pathlib import Path
 
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.runtime.identity import DATABASE_NAME
+from app.runtime.migrations import migrate_database
+
 
 def create_database(data_dir: Path):
     data_dir.mkdir(parents=True, exist_ok=True)
-    database_path = (data_dir / "review.db").resolve()
+    database_path = (data_dir / DATABASE_NAME).resolve()
+    migrate_database(database_path, data_dir.parent / "Backups")
     engine = create_engine(
         f"sqlite:///{database_path.as_posix()}",
         connect_args={"check_same_thread": False},

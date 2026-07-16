@@ -1,5 +1,7 @@
 from typing import Protocol
 
+from app.runtime.identity import CREDENTIAL_SERVICE_NAME
+
 
 class SecretStore(Protocol):
     def get(self, key: str) -> str | None: ...
@@ -26,7 +28,7 @@ class MemorySecretStore:
 class WindowsKeyringSecretStore:
     """Stores secrets in Windows Credential Manager through keyring."""
 
-    def __init__(self, service_name: str = "semiconductor-review-assistant"):
+    def __init__(self, service_name: str = CREDENTIAL_SERVICE_NAME):
         self.service_name = service_name
 
     def get(self, key: str) -> str | None:

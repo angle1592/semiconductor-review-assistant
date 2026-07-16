@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from app.shared.errors import AppError
+from app.runtime.identity import DATABASE_NAME
 
 _EXCLUDED_DATA_DIRECTORIES = {"backups", "restore-staged", "provider-runtime", "runtime"}
 
@@ -43,9 +44,9 @@ def _data_files(data_dir: Path) -> list[Path]:
 def create_backup(data_dir: Path, app_version: str = "0.1.0") -> bytes:
     files = _data_files(data_dir)
     contents: dict[str, bytes] = {}
-    database_path = data_dir / "review.db"
-    with tempfile.TemporaryDirectory(prefix="semiconductor-backup-") as temp:
-        snapshot_path = Path(temp) / "review.db"
+    database_path = data_dir / DATABASE_NAME
+    with tempfile.TemporaryDirectory(prefix="shiyao-backup-") as temp:
+        snapshot_path = Path(temp) / DATABASE_NAME
         if database_path.is_file():
             with (
                 closing(sqlite3.connect(database_path)) as source,
@@ -120,7 +121,7 @@ def restore_backup(content: bytes, data_dir: Path, engine) -> dict:
     if errors:
         raise InvalidBackupError("; ".join(errors))
     data_dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="semiconductor-restore-", dir=data_dir.parent) as temp:
+    with tempfile.TemporaryDirectory(prefix="shiyao-restore-", dir=data_dir.parent) as temp:
         stage = Path(temp)
         with ZipFile(BytesIO(content)) as archive:
             for name in archive.namelist():

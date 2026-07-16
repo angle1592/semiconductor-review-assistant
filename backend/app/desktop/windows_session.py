@@ -58,7 +58,7 @@ class WindowsSessionMonitor:
         import win32con
         import win32gui
 
-        class_name = f"SemiconductorReviewSession_{os.getpid()}_{uuid.uuid4().hex}"
+        class_name = f"ShiyaoSession_{os.getpid()}_{uuid.uuid4().hex}"
 
         def window_proc(window, message, wparam, lparam):
             handled = self._handler.handle(message, wparam)
@@ -81,7 +81,7 @@ class WindowsSessionMonitor:
             self._window = win32gui.CreateWindowEx(
                 0,
                 atom,
-                "SemiconductorReviewSession",
+                "ShiyaoSession",
                 0,
                 0,
                 0,

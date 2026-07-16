@@ -5,6 +5,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.runtime.identity import APPLICATION_DATA_DIR_NAME
+
 
 @dataclass(frozen=True)
 class AppPaths:
@@ -34,15 +36,17 @@ class AppPaths:
 
         if is_frozen:
             local_app_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-            root = Path(os.environ.get("SEMIREVIEW_ROOT", local_app_data / "SemiconductorReview")).resolve()
+            root = Path(
+                os.environ.get("SHIYAO_ROOT", local_app_data / APPLICATION_DATA_DIR_NAME)
+            ).resolve()
             default_data = root / "Data"
         else:
-            root = Path(os.environ.get("SEMIREVIEW_ROOT", source_root)).resolve()
+            root = Path(os.environ.get("SHIYAO_ROOT", source_root)).resolve()
             default_data = source_root / "data"
 
-        data = Path(os.environ.get("SEMIREVIEW_DATA_DIR", default_data)).resolve()
+        data = Path(os.environ.get("SHIYAO_DATA_DIR", default_data)).resolve()
         frontend = Path(
-            os.environ.get("SEMIREVIEW_FRONTEND_DIST", resources / "frontend" / "dist")
+            os.environ.get("SHIYAO_FRONTEND_DIST", resources / "frontend" / "dist")
         ).resolve()
         return cls(
             root=root,

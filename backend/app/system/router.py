@@ -67,7 +67,7 @@ def diagnostics(request: Request) -> StreamingResponse:
     return StreamingResponse(
         BytesIO(content),
         media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="semiconductor-review-diagnostics.zip"'},
+        headers={"Content-Disposition": 'attachment; filename="shiyao-diagnostics.zip"'},
     )
 
 

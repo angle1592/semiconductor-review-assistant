@@ -34,7 +34,7 @@ def test_system_info_reports_first_run_state_without_exposing_secrets(tmp_path: 
 
     assert response.status_code == 200
     assert response.json() == {
-        "application": "semiconductor-review-assistant",
+        "application": "shiyao-review",
         "version": "0.1.0-beta",
         "packaged": True,
         "setup_complete": False,

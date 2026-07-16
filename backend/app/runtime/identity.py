@@ -1,0 +1,5 @@
+APPLICATION_ID = "shiyao-review"
+PROTOCOL_VERSION = 2
+APPLICATION_DATA_DIR_NAME = "Shiyao"
+DATABASE_NAME = "shiyao.db"
+CREDENTIAL_SERVICE_NAME = "shiyao-review"

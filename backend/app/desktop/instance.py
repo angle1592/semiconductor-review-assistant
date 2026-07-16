@@ -9,9 +9,7 @@ from pathlib import Path
 from typing import Callable
 from urllib.request import urlopen
 
-
-APPLICATION_ID = "semiconductor-review-assistant"
-PROTOCOL_VERSION = 1
+from app.runtime.identity import APPLICATION_ID, PROTOCOL_VERSION
 
 
 @dataclass(frozen=True)
@@ -95,7 +93,7 @@ class WindowsUserMutex:
         self._win32api = win32api
         self._win32event = win32event
         safe_user = "".join(character if character.isalnum() else "-" for character in getpass.getuser())
-        self._name = f"Local\\SemiconductorReview-{safe_user}"
+        self._name = f"Local\\Shiyao-{safe_user}"
         self._handle = None
 
     def acquire(self) -> bool:
