@@ -8,6 +8,8 @@ import { ErrorState, LoadingState, PageHeading } from '../components/Ui'
 import { AnalysisPage } from './project/AnalysisPage'
 import { KeyPointsPage } from './project/KeyPointsPage'
 import { MaterialsPage } from './project/MaterialsPage'
+import { MasteryPage as ProjectMasteryPage } from './project/MasteryPage'
+import { ReviewContentPage } from './project/ReviewContentPage'
 
 const tabs = [
   { label: '概览', number: '01' },
@@ -89,9 +91,8 @@ export function ProjectDetailPage() {
         {activeTab === '资料' && <MaterialsPage projectId={projectId} selectedBlockIds={selectedBlockIds} onSelectedBlockIdsChange={setSelectedBlockIds} />}
         {activeTab === '分析' && <AnalysisPage project={project.data} selectedBlockIds={selectedBlockIds} activeRunId={activeRunId} onActiveRunIdChange={setActiveRunId} />}
         {activeTab === '重点' && <KeyPointsPage projectId={projectId} activeRunId={activeRunId} onOpenSourceBlock={(blockId) => { setSelectedBlockIds((ids) => ids.includes(blockId) ? ids : [...ids, blockId]); setActiveTab('资料') }} />}
-        {(activeTab === '复习' || activeTab === '掌握情况') && (
-          <div className="step-placeholder"><span>{tabs.find((tab) => tab.label === activeTab)?.number}</span><h2>{activeTab}能力将在下一阶段接通</h2><p>此处现在只展示流程位置，不会伪造处理结果或掌握数据。</p></div>
-        )}
+        {activeTab === '复习' && <ReviewContentPage projectId={projectId} />}
+        {activeTab === '掌握情况' && <ProjectMasteryPage projectId={projectId} />}
       </div>
     </section>
   )

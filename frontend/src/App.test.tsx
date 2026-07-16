@@ -28,12 +28,14 @@ describe('拾要 application shell', () => {
     expect(screen.getByRole('link', { name: '设置' })).toBeInTheDocument()
   })
 
-  it('renders honest review and mastery placeholders', () => {
+  it('renders the on-demand project review entry', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }))
     render(
       <MemoryRouter initialEntries={['/review']}>
         <AppRoutes />
       </MemoryRouter>,
     )
-    expect(screen.getByRole('heading', { name: '先确认重点，再开始复习' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '选择一个项目开始复习' })).toBeInTheDocument()
+    expect(screen.queryByText('复习队列尚未开放')).not.toBeInTheDocument()
   })
 })
