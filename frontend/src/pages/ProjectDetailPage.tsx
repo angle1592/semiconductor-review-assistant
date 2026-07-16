@@ -20,10 +20,18 @@ const tabs = [
 
 export function ProjectDetailPage() {
   const { projectId = '' } = useParams()
-  const [activeTab, setActiveTab] = useState('概览')
+  const tabStorageKey = `shiyao:project:${projectId}:active-tab`
+  const runStorageKey = `shiyao:project:${projectId}:active-run`
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = sessionStorage.getItem(tabStorageKey)
+    return tabs.some((tab) => tab.label === saved) ? saved! : '概览'
+  })
   const [draft, setDraft] = useState<ReviewProjectInput | null>(null)
   const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([])
-  const [activeRunId, setActiveRunId] = useState<number | null>(null)
+  const [activeRunId, setActiveRunId] = useState<number | null>(() => {
+    const saved = Number(sessionStorage.getItem(runStorageKey))
+    return Number.isInteger(saved) && saved > 0 ? saved : null
+  })
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const project = useQuery({ queryKey: ['project', projectId], queryFn: () => api.getProject(projectId), enabled: Boolean(projectId) })
@@ -45,6 +53,11 @@ export function ProjectDetailPage() {
   useEffect(() => {
     if (project.data) setDraft({ name: project.data.name, description: project.data.description, importance_prompt: project.data.importance_prompt })
   }, [project.data])
+  useEffect(() => { sessionStorage.setItem(tabStorageKey, activeTab) }, [activeTab, tabStorageKey])
+  useEffect(() => {
+    if (activeRunId) sessionStorage.setItem(runStorageKey, String(activeRunId))
+    else sessionStorage.removeItem(runStorageKey)
+  }, [activeRunId, runStorageKey])
 
   if (project.isPending) return <section className="page"><LoadingState label="正在打开项目" /></section>
   if (project.isError || !project.data) return <section className="page"><ErrorState title="项目无法打开" description="项目可能已被删除，或本机服务暂时不可用。" onRetry={() => void project.refetch()} /></section>
