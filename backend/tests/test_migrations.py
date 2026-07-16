@@ -68,8 +68,8 @@ def test_database_upgrades_through_study_artifact_schemas(tmp_path: Path):
 
     migrate_database(database_path, tmp_path / "Backups")
 
-    assert CURRENT_DATABASE_VERSION == 7
-    assert _user_version(database_path) == 7
+    assert CURRENT_DATABASE_VERSION == 8
+    assert _user_version(database_path) == 8
     with sqlite3.connect(database_path) as connection:
         tables = {
             row[0]
@@ -96,6 +96,8 @@ def test_database_upgrades_through_study_artifact_schemas(tmp_path: Path):
         "keypoint",
         "source_question",
         "generated_artifact",
+        "study_attempt",
+        "mastery_record",
     } <= tables
     assert {
         "ix_source_document_project_id",
@@ -109,4 +111,6 @@ def test_database_upgrades_through_study_artifact_schemas(tmp_path: Path):
         "ix_keypoint_project_position",
         "ix_source_question_project_id",
         "ix_generated_artifact_project_kind",
+        "ix_study_attempt_project_created",
+        "ix_mastery_project_level",
     } <= indexes

@@ -176,5 +176,11 @@ def get_artifact(session: Session, artifact_id: int) -> GeneratedArtifact:
 
 def delete_artifact(session: Session, artifact_id: int) -> None:
     artifact = get_artifact(session, artifact_id)
+    from app.mastery.models import MasteryRecord, StudyAttempt
+
+    for record in session.exec(select(MasteryRecord).where(MasteryRecord.project_id == artifact.project_id, MasteryRecord.target_type == "artifact", MasteryRecord.target_id == artifact_id)).all():
+        session.delete(record)
+    for attempt in session.exec(select(StudyAttempt).where(StudyAttempt.project_id == artifact.project_id, StudyAttempt.item_type == "artifact", StudyAttempt.item_id == artifact_id)).all():
+        session.delete(attempt)
     session.delete(artifact)
     session.commit()

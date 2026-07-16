@@ -417,6 +417,7 @@ def _dependent_analysis_records(
     from app.jobs.models import DurableJob
     from app.keypoints.models import KeyPoint, KeyPointCandidate
     from app.study.models import GeneratedArtifact, SourceQuestion
+    from app.mastery.models import MasteryRecord, StudyAttempt
 
     project_runs = session.exec(
         select(AnalysisRun).where(AnalysisRun.project_id == project_id)
@@ -468,6 +469,21 @@ def _dependent_analysis_records(
         or _json_ids(artifact.keypoint_ids_json) & {str(value) for value in keypoint_ids}
         or _json_ids(artifact.source_question_ids_json) & {str(value) for value in question_ids}
     ]
+    target_ids = {
+        "keypoint": {item.id for item in keypoints},
+        "source_question": {item.id for item in questions},
+        "artifact": {item.id for item in artifacts},
+    }
+    attempts = [
+        item
+        for item in session.exec(select(StudyAttempt).where(StudyAttempt.project_id == project_id)).all()
+        if block_ids is None or item.item_id in target_ids.get(item.item_type, set())
+    ]
+    mastery = [
+        item
+        for item in session.exec(select(MasteryRecord).where(MasteryRecord.project_id == project_id)).all()
+        if block_ids is None or item.target_id in target_ids.get(item.target_type, set())
+    ]
     jobs: list[DurableJob] = []
     if run_ids:
         for job in session.exec(select(DurableJob)).all():
@@ -484,6 +500,8 @@ def _dependent_analysis_records(
         "keypoints": list(keypoints),
         "questions": list(questions),
         "artifacts": list(artifacts),
+        "attempts": list(attempts),
+        "mastery": list(mastery),
         "batches": batches,
         "runs": list(runs),
         "jobs": jobs,
@@ -491,7 +509,7 @@ def _dependent_analysis_records(
 
 
 def _delete_dependencies(session: Session, dependencies: dict[str, list]) -> None:
-    for name in ("artifacts", "questions", "candidates", "keypoints", "batches", "jobs", "runs"):
+    for name in ("attempts", "mastery", "artifacts", "questions", "candidates", "keypoints", "batches", "jobs", "runs"):
         for record in dependencies[name]:
             session.delete(record)
 

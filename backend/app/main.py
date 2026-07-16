@@ -27,6 +27,7 @@ from app.runtime.identity import APPLICATION_ID, DATABASE_NAME, PROTOCOL_VERSION
 from app.runtime.paths import AppPaths
 from app.system.router import router as system_router
 from app.study.router import router as study_router
+from app.mastery.router import router as mastery_router
 
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,7 @@ def create_app(
     app.include_router(backup_router)
     app.include_router(system_router)
     app.include_router(study_router)
+    app.include_router(mastery_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:

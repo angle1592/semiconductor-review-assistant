@@ -8,7 +8,7 @@ from pathlib import Path
 from app.runtime.identity import APPLICATION_ID
 
 
-CURRENT_DATABASE_VERSION = 7
+CURRENT_DATABASE_VERSION = 8
 MIGRATION_BACKUP_LIMIT = 5
 
 
@@ -314,6 +314,39 @@ def _migrate_to_v7(connection: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_to_v8(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS study_attempt (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            mode TEXT NOT NULL,
+            item_type TEXT NOT NULL,
+            item_id INTEGER NOT NULL,
+            response_json TEXT,
+            correct INTEGER,
+            self_rating TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_study_attempt_project_created
+            ON study_attempt(project_id, created_at);
+        CREATE TABLE IF NOT EXISTS mastery_record (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            target_type TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            level TEXT NOT NULL DEFAULT 'unrated',
+            last_attempt_at TEXT,
+            updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_mastery_project_target
+            ON mastery_record(project_id, target_type, target_id);
+        CREATE INDEX IF NOT EXISTS ix_mastery_project_level
+            ON mastery_record(project_id, level);
+        """
+    )
+
+
 MIGRATIONS = {
     1: _migrate_to_v1,
     2: _migrate_to_v2,
@@ -322,6 +355,7 @@ MIGRATIONS = {
     5: _migrate_to_v5,
     6: _migrate_to_v6,
     7: _migrate_to_v7,
+    8: _migrate_to_v8,
 }
 
 
