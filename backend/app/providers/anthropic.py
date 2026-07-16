@@ -65,6 +65,21 @@ class AnthropicAdapter:
         text, response, usage = await self._complete(request.model, request.prompt, request.system, request.images)
         return self._result(text, request.model, response, usage)
 
+    async def probe_prompt_cache(self, model: str) -> ProviderResult[str]:
+        payload = {
+            "model": model,
+            "max_tokens": 8,
+            "cache_control": {"type": "ephemeral"},
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "只回答 OK。"}]}],
+        }
+        response = await self._send(self.endpoints.inference_url, payload=payload)
+        try:
+            body = response.json()
+            text = next(item["text"] for item in body["content"] if item.get("type") == "text")
+            return self._result(text, model, response, body.get("usage", {}))
+        except (KeyError, StopIteration, TypeError, ValueError) as error:
+            raise invalid_response_error() from error
+
     async def generate_json(self, request: StructuredRequest[Any]) -> ProviderResult[Any]:
         schema = request.output_type.model_json_schema()
         prompt = f"{request.prompt}\n只返回符合此 JSON Schema 的 JSON：{json.dumps(schema, ensure_ascii=False)}"

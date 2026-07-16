@@ -5,9 +5,21 @@ from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 
+from app.providers.contracts import ProviderResult
 from app.providers.credentials import MemorySecretStore
 from app.main import create_app
 from app.runtime.paths import AppPaths
+
+
+class PassingAdapter:
+    async def list_models(self):
+        return []
+
+    async def generate_text(self, request):
+        return ProviderResult(value="ok", model_id=request.model)
+
+    async def generate_json(self, request):
+        return ProviderResult(value=request.output_type(ok=True, message="ok"), model_id=request.model)
 
 
 def _configured_app(tmp_path: Path):
@@ -20,10 +32,27 @@ def _configured_app(tmp_path: Path):
         frontend_dist=tmp_path / "frontend" / "dist",
     )
     paths.ensure_directories()
-    app = create_app(data_dir=paths.data, secret_store=MemorySecretStore())
+    app = create_app(
+        data_dir=paths.data,
+        secret_store=MemorySecretStore(),
+        provider_adapter_factory=lambda _profile, _key: PassingAdapter(),
+    )
     app.state.paths = paths
     app.state.packaged = True
     return app, paths
+
+
+def _enable_provider(client: TestClient) -> dict:
+    provider = client.post(
+        "/api/providers",
+        json={"name": "主力服务", "protocol": "openai_compatible", "base_url": "https://models.example", "api_key": "test-only-key"},
+    ).json()
+    model = client.post(
+        f"/api/providers/{provider['id']}/models",
+        json={"model_id": "vision-model", "display_name": "Vision Model"},
+    ).json()
+    client.post(f"/api/providers/{provider['id']}/models/{model['id']}:probe")
+    return client.post(f"/api/providers/{provider['id']}:enable").json()
 
 
 def test_system_info_reports_first_run_state_without_exposing_secrets(tmp_path: Path):
@@ -48,15 +77,7 @@ def test_setup_completion_requires_configuration_and_persists_marker(tmp_path: P
 
     with TestClient(app) as client:
         rejected = client.post("/api/system/setup-complete")
-        client.put(
-            "/api/settings/ai",
-            json={
-                "provider": "openai_compatible",
-                "base_url": "https://models.example/v1",
-                "model": "vision-model",
-                "api_key": "test-only-key",
-            },
-        )
+        _enable_provider(client)
         completed = client.post("/api/system/setup-complete")
         info = client.get("/api/system/info")
 
@@ -66,20 +87,15 @@ def test_setup_completion_requires_configuration_and_persists_marker(tmp_path: P
     assert info.json()["setup_complete"] is True
 
 
-def test_changing_ai_settings_invalidates_setup_marker(tmp_path: Path):
+def test_changing_provider_settings_invalidates_setup_marker(tmp_path: Path):
     app, paths = _configured_app(tmp_path)
     marker = paths.data / ".setup-complete"
     marker.write_text("complete", encoding="ascii")
 
     with TestClient(app) as client:
-        client.put(
-            "/api/settings/ai",
-            json={
-                "provider": "openai_compatible",
-                "base_url": "https://models.example/v1",
-                "model": "new-model",
-                "api_key": "replacement-key",
-            },
+        client.post(
+            "/api/providers",
+            json={"name": "备用服务", "protocol": "anthropic", "base_url": "https://relay.example", "api_key": "replacement-key"},
         )
         info = client.get("/api/system/info")
 

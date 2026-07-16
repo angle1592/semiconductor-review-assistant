@@ -11,7 +11,8 @@ from sqlalchemy import text
 
 from app.backup.router import router as backup_router
 from app.providers.credentials import SecretStore, WindowsKeyringSecretStore
-from app.providers.service import ProviderProfileService
+from app.providers.router import router as providers_router
+from app.providers.service import AdapterFactory, ProviderProfileService, default_adapter_factory
 from app.projects.router import router as projects_router
 from app.shared.database import create_database
 from app.shared.errors import AppError, app_error_handler, unexpected_error_handler
@@ -29,6 +30,7 @@ def create_app(
     data_dir: str | Path,
     *,
     secret_store: SecretStore | None = None,
+    provider_adapter_factory: AdapterFactory = default_adapter_factory,
     frontend_dist_dir: str | Path | None = None,
 ) -> FastAPI:
     resolved_data_dir = Path(data_dir).resolve()
@@ -53,7 +55,7 @@ def create_app(
     app.state.packaged = False
     app.state.database = create_database(resolved_data_dir)
     app.state.provider_profile_service = ProviderProfileService(
-        app.state.database, secret_store or WindowsKeyringSecretStore()
+        app.state.database, secret_store or WindowsKeyringSecretStore(), provider_adapter_factory
     )
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
@@ -89,6 +91,7 @@ def create_app(
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)
     app.include_router(projects_router)
+    app.include_router(providers_router)
     app.include_router(backup_router)
     app.include_router(system_router)
 
