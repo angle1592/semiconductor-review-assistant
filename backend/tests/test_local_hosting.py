@@ -16,7 +16,7 @@ def test_ready_cors_security_headers_and_spa_hosting(tmp_path: Path):
         ready = client.get("/ready")
         page = client.get("/")
         preflight = client.options(
-            "/api/courses",
+            "/api/projects",
             headers={
                 "Origin": "http://127.0.0.1:5173",
                 "Access-Control-Request-Method": "GET",

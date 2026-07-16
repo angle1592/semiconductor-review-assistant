@@ -12,12 +12,8 @@ from sqlalchemy import text
 from app.ai.router import router as ai_router
 from app.ai.secrets import SecretStore, WindowsKeyringSecretStore
 from app.ai.settings import AISettingsService, ProviderFactory, default_provider_factory
-from app.content.router import router as content_router
-from app.courses.router import router as courses_router
 from app.backup.router import router as backup_router
-from app.learning.provider import ProviderFactory as LearningProviderFactory
-from app.learning.ai_adapter import LearningAIAdapter
-from app.learning.router import router as learning_router
+from app.projects.router import router as projects_router
 from app.shared.database import create_database
 from app.shared.errors import AppError, app_error_handler, unexpected_error_handler
 from app.shared.request_id import RequestIdMiddleware
@@ -35,7 +31,6 @@ def create_app(
     *,
     secret_store: SecretStore | None = None,
     ai_provider_factory: ProviderFactory = default_provider_factory,
-    learning_provider_factory: LearningProviderFactory | None = None,
     frontend_dist_dir: str | Path | None = None,
 ) -> FastAPI:
     resolved_data_dir = Path(data_dir).resolve()
@@ -65,13 +60,6 @@ def create_app(
         secret_store or WindowsKeyringSecretStore(),
         ai_provider_factory,
     )
-    def default_learning_provider():
-        return LearningAIAdapter(app.state.ai_settings_service.create_provider())
-
-    app.state.ai_provider_factory = learning_provider_factory or default_learning_provider
-    if learning_provider_factory is None:
-        app.state.ai_answer_assessor = default_learning_provider
-
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -105,10 +93,8 @@ def create_app(
         return response
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)
-    app.include_router(courses_router)
-    app.include_router(content_router)
+    app.include_router(projects_router)
     app.include_router(ai_router)
-    app.include_router(learning_router)
     app.include_router(backup_router)
     app.include_router(system_router)
 
