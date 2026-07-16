@@ -8,7 +8,7 @@ from pathlib import Path
 from app.runtime.identity import APPLICATION_ID
 
 
-CURRENT_DATABASE_VERSION = 3
+CURRENT_DATABASE_VERSION = 4
 MIGRATION_BACKUP_LIMIT = 5
 
 
@@ -131,10 +131,73 @@ def _migrate_to_v3(connection: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_to_v4(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS durable_job (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'queued',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            max_attempts INTEGER NOT NULL DEFAULT 3,
+            available_at TEXT NOT NULL,
+            worker_id TEXT,
+            lease_expires_at TEXT,
+            last_heartbeat_at TEXT,
+            public_error_code TEXT,
+            error_detail TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_durable_job_kind ON durable_job(kind);
+        CREATE INDEX IF NOT EXISTS ix_durable_job_worker_id ON durable_job(worker_id);
+        CREATE INDEX IF NOT EXISTS ix_durable_job_status_available_at
+            ON durable_job(status, available_at);
+        CREATE TABLE IF NOT EXISTS analysis_run (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            status TEXT NOT NULL DEFAULT 'queued',
+            selected_block_ids_json TEXT NOT NULL,
+            prompt_snapshot TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            provider_config_generation INTEGER NOT NULL,
+            model_id TEXT NOT NULL,
+            schema_version TEXT NOT NULL,
+            pipeline_version TEXT NOT NULL,
+            total_batches INTEGER NOT NULL DEFAULT 0,
+            completed_batches INTEGER NOT NULL DEFAULT 0,
+            failed_batches INTEGER NOT NULL DEFAULT 0,
+            cancellation_requested INTEGER NOT NULL DEFAULT 0,
+            public_error_code TEXT,
+            error_detail TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_analysis_run_project_id ON analysis_run(project_id);
+        CREATE TABLE IF NOT EXISTS analysis_batch (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL REFERENCES analysis_run(id),
+            ordinal INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'queued',
+            block_ids_json TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            result_json TEXT,
+            public_error_code TEXT,
+            error_detail TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_analysis_batch_run_id ON analysis_batch(run_id);
+        """
+    )
+
+
 MIGRATIONS = {
     1: _migrate_to_v1,
     2: _migrate_to_v2,
     3: _migrate_to_v3,
+    4: _migrate_to_v4,
 }
 
 

@@ -54,7 +54,7 @@ def test_current_shiyao_database_is_idempotent(tmp_path: Path):
         assert connection.execute("SELECT id FROM kept").fetchone() == ("yes",)
 
 
-def test_phase_one_database_upgrades_through_provider_and_source_schemas(tmp_path: Path):
+def test_phase_one_database_upgrades_through_provider_source_and_job_schemas(tmp_path: Path):
     database_path = tmp_path / "Data" / "shiyao.db"
     database_path.parent.mkdir()
     with sqlite3.connect(database_path) as connection:
@@ -68,8 +68,8 @@ def test_phase_one_database_upgrades_through_provider_and_source_schemas(tmp_pat
 
     migrate_database(database_path, tmp_path / "Backups")
 
-    assert CURRENT_DATABASE_VERSION == 3
-    assert _user_version(database_path) == 3
+    assert CURRENT_DATABASE_VERSION == 4
+    assert _user_version(database_path) == 4
     with sqlite3.connect(database_path) as connection:
         tables = {
             row[0]
@@ -89,10 +89,16 @@ def test_phase_one_database_upgrades_through_provider_and_source_schemas(tmp_pat
         "model_profile",
         "source_document",
         "source_block",
+        "durable_job",
+        "analysis_run",
+        "analysis_batch",
     } <= tables
     assert {
         "ix_source_document_project_id",
         "ix_source_document_sha256",
         "ix_source_block_document_id",
         "ix_source_block_ordinal",
+        "ix_durable_job_status_available_at",
+        "ix_analysis_run_project_id",
+        "ix_analysis_batch_run_id",
     } <= indexes
