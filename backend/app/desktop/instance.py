@@ -16,6 +16,7 @@ from app.runtime.identity import APPLICATION_ID, PROTOCOL_VERSION
 class InstanceMetadata:
     pid: int
     port: int
+    worker_pid: int | None = None
     application: str = APPLICATION_ID
     protocol_version: int = PROTOCOL_VERSION
 
@@ -41,6 +42,7 @@ class InstanceStore:
             metadata = InstanceMetadata(
                 pid=int(payload["pid"]),
                 port=int(payload["port"]),
+                worker_pid=int(payload["worker_pid"]) if payload.get("worker_pid") else None,
                 application=str(payload["application"]),
                 protocol_version=int(payload["protocol_version"]),
             )

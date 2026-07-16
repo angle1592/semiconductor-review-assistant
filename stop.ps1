@@ -18,6 +18,8 @@ if ([string]::IsNullOrWhiteSpace($PythonPath)) {
 }
 $PidFile = Join-Path $RuntimeDir 'server.pid'
 $StopFile = Join-Path $RuntimeDir 'server.stop'
+$WorkerPidFile = Join-Path $RuntimeDir 'worker.pid'
+$WorkerStopFile = Join-Path $RuntimeDir 'worker.stop'
 
 function Get-VerifiedRunnerProcess {
     param([int]$ProcessId)
@@ -33,6 +35,28 @@ function Get-VerifiedRunnerProcess {
         return $null
     }
     return $ProcessInfo
+}
+
+function Get-VerifiedWorkerProcess {
+    param([int]$ProcessId)
+    $ProcessInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
+    if ($null -eq $ProcessInfo -or [string]::IsNullOrWhiteSpace($ProcessInfo.CommandLine)) { return $null }
+    $HasPythonPath = $ProcessInfo.CommandLine.IndexOf($PythonPath, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    if (-not $HasPythonPath -or $ProcessInfo.CommandLine -notlike '*-m app.jobs.worker*') { return $null }
+    return $ProcessInfo
+}
+
+function Stop-RecordedWorker {
+    Set-Content -LiteralPath $WorkerStopFile -Value 'stop' -Encoding Ascii
+    if (-not (Test-Path -LiteralPath $WorkerPidFile)) { return }
+    $WorkerId = [int](Get-Content -LiteralPath $WorkerPidFile -Raw)
+    $Worker = Get-VerifiedWorkerProcess $WorkerId
+    if ($null -eq $Worker) { return }
+    for ($Attempt = 0; $Attempt -lt 50; $Attempt++) {
+        if ($null -eq (Get-VerifiedWorkerProcess $WorkerId)) { return }
+        Start-Sleep -Milliseconds 200
+    }
+    if ($null -ne (Get-VerifiedWorkerProcess $WorkerId)) { Stop-Process -Id $WorkerId -Force -ErrorAction SilentlyContinue }
 }
 
 function Get-ListenerProcessId {
@@ -55,7 +79,7 @@ function Invoke-WithLauncherMutex {
         $Hasher.Dispose()
     }
     $Hash = [System.BitConverter]::ToString($HashBytes).Replace('-', '')
-    $Mutex = [System.Threading.Mutex]::new($false, "Local\SemiconductorReview-$Hash")
+    $Mutex = [System.Threading.Mutex]::new($false, "Local\Shiyao-$Hash")
     $Acquired = $false
     try {
         try {
@@ -78,8 +102,9 @@ function Invoke-WithLauncherMutex {
 Invoke-WithLauncherMutex {
 $ListenerId = Get-ListenerProcessId
 if ($null -eq $ListenerId) {
-    Remove-Item -LiteralPath $PidFile, $StopFile -Force -ErrorAction SilentlyContinue
-    Write-Host "端口 $Port 上没有正在运行的半导体复习台。" -ForegroundColor Yellow
+    Stop-RecordedWorker
+    Remove-Item -LiteralPath $PidFile, $StopFile, $WorkerPidFile, $WorkerStopFile -Force -ErrorAction SilentlyContinue
+    Write-Host "端口 $Port 上没有正在运行的拾要。" -ForegroundColor Yellow
     return
 }
 
@@ -95,6 +120,7 @@ if ($null -ne $Parent) {
 }
 
 Set-Content -LiteralPath $StopFile -Value 'stop' -Encoding Ascii
+Set-Content -LiteralPath $WorkerStopFile -Value 'stop' -Encoding Ascii
 for ($Attempt = 0; $Attempt -lt 40; $Attempt++) {
     if ($null -eq (Get-ListenerProcessId)) {
         break
@@ -122,6 +148,7 @@ if ($null -ne $SafeParentId) {
         Stop-Process -Id $SafeParentId -Force -ErrorAction SilentlyContinue
     }
 }
-Remove-Item -LiteralPath $PidFile, $StopFile -Force -ErrorAction SilentlyContinue
-Write-Host '半导体复习台已停止。' -ForegroundColor Green
+Stop-RecordedWorker
+Remove-Item -LiteralPath $PidFile, $StopFile, $WorkerPidFile, $WorkerStopFile -Force -ErrorAction SilentlyContinue
+Write-Host '拾要已停止。' -ForegroundColor Green
 }

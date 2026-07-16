@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import sys
 import threading
 import time
 import webbrowser
 from collections.abc import Callable
+from pathlib import Path
 from urllib.request import Request, urlopen
 
 import uvicorn
@@ -66,6 +69,47 @@ def _server_factory(app, port: int):
     )
 
 
+def _worker_factory(paths: AppPaths, stop_file) -> subprocess.Popen:
+    environment = os.environ.copy()
+    environment["SHIYAO_ROOT"] = str(paths.root)
+    environment["SHIYAO_WORKER_STOP_FILE"] = str(stop_file)
+    command = [sys.executable, "--worker-child"] if getattr(sys, "frozen", False) else [
+        sys.executable, "-m", "app.jobs.worker"
+    ]
+    startupinfo = None
+    creationflags = 0
+    if os.name == "nt":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        creationflags = subprocess.CREATE_NO_WINDOW
+    return subprocess.Popen(
+        command,
+        cwd=Path(__file__).resolve().parents[2],
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        startupinfo=startupinfo,
+        creationflags=creationflags,
+    )
+
+
+def _stop_worker(worker, stop_file: Path, timeout: float = 10) -> None:
+    stop_file.parent.mkdir(parents=True, exist_ok=True)
+    stop_file.write_text("stop", encoding="ascii")
+    try:
+        worker.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        worker.terminate()
+        try:
+            worker.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            worker.kill()
+            worker.wait(timeout=3)
+    finally:
+        stop_file.unlink(missing_ok=True)
+
+
 def _wait_for_instance(
     store: InstanceStore,
     validator: Callable[[InstanceMetadata], bool],
@@ -86,6 +130,7 @@ def launch(
     *,
     mutex_factory: Callable[[], object] = WindowsUserMutex,
     server_factory: Callable = _server_factory,
+    worker_factory: Callable = _worker_factory,
     browser_open: Callable[[str], object] = webbrowser.open,
     validator: Callable[[InstanceMetadata], bool] = validate_instance,
     port_picker: Callable[[], int] = find_free_port,
@@ -115,7 +160,10 @@ def launch(
         app.state.paths = resolved_paths
         app.state.packaged = bool(getattr(__import__("sys"), "frozen", False))
         port = port_picker()
-        metadata = InstanceMetadata(pid=os.getpid(), port=port)
+        worker_stop_file = resolved_paths.runtime / "worker.stop"
+        worker_stop_file.unlink(missing_ok=True)
+        worker = worker_factory(resolved_paths, worker_stop_file)
+        metadata = InstanceMetadata(pid=os.getpid(), port=port, worker_pid=worker.pid)
         server = server_factory(app, port)
         app.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
         session_monitor = WindowsSessionMonitor(app.state.shutdown_callback)
@@ -133,6 +181,7 @@ def launch(
             server.run()
         finally:
             session_monitor.close()
+            _stop_worker(worker, worker_stop_file)
             store.remove_if_owned_by(os.getpid())
             browser_thread.join(timeout=1)
         return 0
@@ -164,7 +213,13 @@ def shutdown_existing(paths: AppPaths | None = None) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--shutdown", action="store_true")
+    parser.add_argument("--worker-child", action="store_true")
     arguments, _unknown = parser.parse_known_args()
+    if arguments.worker_child:
+        from app.jobs.worker import main as worker_main
+
+        worker_main()
+        return 0
     return shutdown_existing() if arguments.shutdown else launch()
 
 

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "semiconductor-review-backend"
+name = "shiyao-backend"
 version = "0.1.0"
 description = "Local-first semiconductor after-class review assistant"
 requires-python = ">=3.11"

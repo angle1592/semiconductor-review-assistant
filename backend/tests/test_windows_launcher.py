@@ -366,7 +366,7 @@ def test_stopper_does_not_kill_a_runner_referenced_by_stale_metadata(tmp_path: P
 
 
 def test_shortcut_installer_creates_hidden_desktop_launcher(tmp_path: Path):
-    shortcut_path = tmp_path / "folder with spaces" / "半导体复习台.lnk"
+    shortcut_path = tmp_path / "folder with spaces" / "拾要.lnk"
     env = os.environ.copy()
 
     installed = _run_script(

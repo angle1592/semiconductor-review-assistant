@@ -7,11 +7,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $release = Join-Path $root 'release'
-$installer = Join-Path $release 'SemiconductorReview-0.1.0-beta-Setup.exe'
-$guide = Join-Path $release 'SemiconductorReview-Guide-zh-CN.pdf'
+$installer = Join-Path $release 'Shiyao-0.1.0-beta-Setup.exe'
+$guide = Join-Path $release 'Shiyao-Guide-zh-CN.pdf'
 $checksum = "$installer.sha256"
 $publish = Join-Path $release 'publish'
-$staging = Join-Path $release 'staging\SemiconductorReview'
+$staging = Join-Path $release 'staging\Shiyao'
 $config = Join-Path $root '.gitleaks.toml'
 $securityRoot = Join-Path $root 'build\security-source'
 $securityArchive = Join-Path $root 'build\security-source.zip'

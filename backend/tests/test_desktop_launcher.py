@@ -28,6 +28,19 @@ class FakeMutex:
         self.closed = True
 
 
+class FakeWorker:
+    pid = 777
+
+    def wait(self, timeout=None):
+        return 0
+
+    def terminate(self):
+        return None
+
+    def kill(self):
+        return None
+
+
 class FakeServer:
     def __init__(self):
         self.should_exit = False
@@ -68,6 +81,7 @@ def test_first_launch_runs_server_and_cleans_runtime_metadata(tmp_path: Path):
         paths,
         mutex_factory=lambda: mutex,
         server_factory=lambda _app, _port: server,
+        worker_factory=lambda _paths, _stop: FakeWorker(),
         browser_open=opened.append,
         validator=lambda _metadata: True,
         port_picker=lambda: 54322,
@@ -91,6 +105,7 @@ def test_completed_setup_opens_dashboard_on_new_process(tmp_path: Path):
         paths,
         mutex_factory=lambda: FakeMutex(acquired=True),
         server_factory=lambda _app, _port: server,
+        worker_factory=lambda _paths, _stop: FakeWorker(),
         browser_open=opened.append,
         validator=lambda _metadata: True,
         port_picker=lambda: 54323,

@@ -42,7 +42,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="SemiconductorReview",
+    name="Shiyao",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -58,5 +58,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="SemiconductorReview",
+    name="Shiyao",
 )

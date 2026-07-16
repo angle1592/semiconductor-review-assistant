@@ -1,7 +1,7 @@
-#define MyAppName "半导体复习台"
+#define MyAppName "拾要"
 #define MyAppVersion "0.1.0-beta"
 #define MyAppPublisher "angle1592"
-#define MyAppExeName "SemiconductorReview.exe"
+#define MyAppExeName "Shiyao.exe"
 
 [Setup]
 AppId={{A74E3B83-222F-4C35-B27C-7238356FE5CD}
@@ -9,7 +9,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\Programs\SemiconductorReview
+DefaultDirName={localappdata}\Programs\Shiyao
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -17,7 +17,7 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.17763
 OutputDir=..\release
-OutputBaseFilename=SemiconductorReview-0.1.0-beta-Setup
+OutputBaseFilename=Shiyao-0.1.0-beta-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -32,7 +32,7 @@ VersionInfoProductVersion=0.1.0.0
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "..\release\staging\SemiconductorReview\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\release\staging\Shiyao\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
@@ -57,7 +57,7 @@ begin
   if StopInstalledApplication() then
     Result := ''
   else
-    Result := '无法安全停止正在运行的半导体复习台。请稍后重试。';
+    Result := '无法安全停止正在运行的拾要。请稍后重试。';
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -66,13 +66,13 @@ var
 begin
   if CurUninstallStep = usUninstall then
     if not StopInstalledApplication() then
-      RaiseException('无法安全停止正在运行的半导体复习台。');
+      RaiseException('无法安全停止正在运行的拾要。');
 
   if CurUninstallStep = usPostUninstall then
   begin
-    DataDir := ExpandConstant('{localappdata}\SemiconductorReview');
+    DataDir := ExpandConstant('{localappdata}\Shiyao');
     if DirExists(DataDir) and
-       (SuppressibleMsgBox('是否同时永久删除本机课程、课件、答案、复习历史、备份和日志？' + #13#10 +
+       (SuppressibleMsgBox('是否同时永久删除本机资料、重点、题目、复习内容、掌握记录、备份和日志？' + #13#10 +
          '默认建议保留，方便以后重装或升级。', mbConfirmation, MB_YESNO, IDNO) = IDYES) then
       DelTree(DataDir, True, True, True);
   end;

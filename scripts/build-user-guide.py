@@ -83,7 +83,7 @@ def page_footer(canvas, doc):
     canvas.line(22 * mm, 16 * mm, 188 * mm, 16 * mm)
     canvas.setFont("STSong-Light", 8)
     canvas.setFillColor(MUTED)
-    canvas.drawString(22 * mm, 10 * mm, "半导体复习台 · 0.1.0-beta")
+    canvas.drawString(22 * mm, 10 * mm, "拾要 · 0.1.0-beta")
     canvas.drawRightString(188 * mm, 10 * mm, f"{doc.page}")
     canvas.restoreState()
 
@@ -147,7 +147,7 @@ def build(source: Path, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     document = SimpleDocTemplate(
         str(output), pagesize=A4, rightMargin=22 * mm, leftMargin=22 * mm,
-        topMargin=19 * mm, bottomMargin=22 * mm, title="半导体复习台 Windows 测试版安装与使用说明",
+        topMargin=19 * mm, bottomMargin=22 * mm, title="拾要 Windows 测试版安装与使用说明",
         author="angle1592", subject="安装、配置、备份、更新与卸载说明",
     )
     document.build(story, onFirstPage=page_footer, onLaterPages=page_footer)
@@ -156,6 +156,6 @@ def build(source: Path, output: Path) -> None:
 if __name__ == "__main__":
     repository = Path(__file__).resolve().parents[1]
     source_path = Path(sys.argv[1]) if len(sys.argv) > 1 else repository / "docs" / "user-guide" / "windows-beta-installation.md"
-    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else repository / "release" / "SemiconductorReview-Guide-zh-CN.pdf"
+    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else repository / "release" / "Shiyao-Guide-zh-CN.pdf"
     build(source_path.resolve(), output_path.resolve())
     print(output_path.resolve())

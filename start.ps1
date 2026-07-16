@@ -113,7 +113,7 @@ function Invoke-WithLauncherMutex {
         $Hasher.Dispose()
     }
     $Hash = [System.BitConverter]::ToString($HashBytes).Replace('-', '')
-    $Mutex = [System.Threading.Mutex]::new($false, "Local\SemiconductorReview-$Hash")
+    $Mutex = [System.Threading.Mutex]::new($false, "Local\Shiyao-$Hash")
     $Acquired = $false
     try {
         try {
@@ -139,7 +139,7 @@ if ($Readiness -eq 'current' -or ($Readiness -eq 'legacy' -and (Test-VerifiedRun
     if (-not $NoBrowser) {
         Start-Process $Url
     }
-    Write-Host "半导体复习台已在运行，已重新打开：$Url" -ForegroundColor Green
+    Write-Host "拾要已在运行，已重新打开：$Url" -ForegroundColor Green
     return
 }
 
@@ -158,19 +158,27 @@ if (-not (Test-Path -LiteralPath $PythonPath) -or -not (Test-Path -LiteralPath $
 New-Item -ItemType Directory -Path $RuntimeDir -Force | Out-Null
 $PidFile = Join-Path $RuntimeDir 'server.pid'
 $StopFile = Join-Path $RuntimeDir 'server.stop'
+$WorkerPidFile = Join-Path $RuntimeDir 'worker.pid'
+$WorkerStopFile = Join-Path $RuntimeDir 'worker.stop'
 $OutputLog = Join-Path $RuntimeDir 'server.stdout.log'
 $ErrorLog = Join-Path $RuntimeDir 'server.stderr.log'
-Remove-Item -LiteralPath $PidFile, $StopFile -Force -ErrorAction SilentlyContinue
+$WorkerOutputLog = Join-Path $RuntimeDir 'worker.stdout.log'
+$WorkerErrorLog = Join-Path $RuntimeDir 'worker.stderr.log'
+Remove-Item -LiteralPath $PidFile, $StopFile, $WorkerPidFile, $WorkerStopFile -Force -ErrorAction SilentlyContinue
 
 $HadStopFile = Test-Path Env:SHIYAO_STOP_FILE
 $PreviousStopFile = $env:SHIYAO_STOP_FILE
 $HadPort = Test-Path Env:SHIYAO_PORT
 $PreviousPort = $env:SHIYAO_PORT
+$HadWorkerStopFile = Test-Path Env:SHIYAO_WORKER_STOP_FILE
+$PreviousWorkerStopFile = $env:SHIYAO_WORKER_STOP_FILE
 $Server = $null
+$Worker = $null
 
 try {
     $env:SHIYAO_STOP_FILE = $StopFile
     $env:SHIYAO_PORT = [string]$Port
+    $env:SHIYAO_WORKER_STOP_FILE = $WorkerStopFile
     $Server = Start-Process -FilePath $PythonPath `
         -ArgumentList @('-m', 'app.runner') `
         -WorkingDirectory $Backend `
@@ -178,12 +186,21 @@ try {
         -RedirectStandardOutput $OutputLog `
         -RedirectStandardError $ErrorLog `
         -PassThru
+    $Worker = Start-Process -FilePath $PythonPath `
+        -ArgumentList @('-m', 'app.jobs.worker') `
+        -WorkingDirectory $Backend `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $WorkerOutputLog `
+        -RedirectStandardError $WorkerErrorLog `
+        -PassThru
 } finally {
     Restore-EnvironmentValue 'SHIYAO_STOP_FILE' $HadStopFile $PreviousStopFile
     Restore-EnvironmentValue 'SHIYAO_PORT' $HadPort $PreviousPort
+    Restore-EnvironmentValue 'SHIYAO_WORKER_STOP_FILE' $HadWorkerStopFile $PreviousWorkerStopFile
 }
 
 Set-Content -LiteralPath $PidFile -Value $Server.Id -Encoding Ascii
+Set-Content -LiteralPath $WorkerPidFile -Value $Worker.Id -Encoding Ascii
 
 $Ready = $false
 for ($Attempt = 0; $Attempt -lt 40; $Attempt++) {
@@ -199,10 +216,14 @@ for ($Attempt = 0; $Attempt -lt 40; $Attempt++) {
 
 if (-not $Ready) {
     Set-Content -LiteralPath $StopFile -Value 'stop' -Encoding Ascii
+    Set-Content -LiteralPath $WorkerStopFile -Value 'stop' -Encoding Ascii
     if (-not $Server.HasExited -and -not $Server.WaitForExit(5000)) {
         Stop-Process -Id $Server.Id -Force -ErrorAction SilentlyContinue
     }
-    Remove-Item -LiteralPath $PidFile, $StopFile -Force -ErrorAction SilentlyContinue
+    if ($Worker -and -not $Worker.HasExited -and -not $Worker.WaitForExit(5000)) {
+        Stop-Process -Id $Worker.Id -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -LiteralPath $PidFile, $StopFile, $WorkerPidFile, $WorkerStopFile -Force -ErrorAction SilentlyContinue
     $Details = ''
     if (Test-Path -LiteralPath $ErrorLog) {
         $Details = (Get-Content -LiteralPath $ErrorLog -Tail 8) -join [Environment]::NewLine
@@ -216,5 +237,5 @@ if (-not $Ready) {
 if (-not $NoBrowser) {
     Start-Process $Url
 }
-Write-Host "半导体复习台已启动：$Url" -ForegroundColor Green
+Write-Host "拾要已启动：$Url" -ForegroundColor Green
 }

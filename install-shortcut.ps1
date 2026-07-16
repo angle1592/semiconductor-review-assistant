@@ -17,7 +17,7 @@ if (-not (Test-Path -LiteralPath $StartScript -PathType Leaf)) {
 
 if ([string]::IsNullOrWhiteSpace($ShortcutPath)) {
     $Desktop = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
-    $ShortcutPath = Join-Path $Desktop '半导体复习台.lnk'
+    $ShortcutPath = Join-Path $Desktop '拾要.lnk'
 }
 $ShortcutPath = [System.IO.Path]::GetFullPath($ShortcutPath)
 $ShortcutDirectory = Split-Path -Parent $ShortcutPath
@@ -25,13 +25,13 @@ New-Item -ItemType Directory -Path $ShortcutDirectory -Force | Out-Null
 
 $PowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
 $Shell = New-Object -ComObject WScript.Shell
-$TemporaryShortcutPath = Join-Path $ShortcutDirectory ".semireview-$([guid]::NewGuid().ToString('N')).lnk"
+$TemporaryShortcutPath = Join-Path $ShortcutDirectory ".shiyao-$([guid]::NewGuid().ToString('N')).lnk"
 try {
     $Shortcut = $Shell.CreateShortcut($TemporaryShortcutPath)
     $Shortcut.TargetPath = $PowerShell
     $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartScript`""
     $Shortcut.WorkingDirectory = Split-Path -Parent $StartScript
-    $Shortcut.Description = '打开半导体课后复习助手'
+    $Shortcut.Description = '打开拾要'
     $Shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,14"
     $Shortcut.Save()
     Move-Item -LiteralPath $TemporaryShortcutPath -Destination $ShortcutPath -Force

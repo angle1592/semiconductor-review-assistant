@@ -9,7 +9,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $frontend = Join-Path $root 'frontend'
 $backend = Join-Path $root 'backend'
 $buildRoot = Join-Path $root 'build\pyinstaller'
-$staging = Join-Path $root 'release\staging\SemiconductorReview'
+$staging = Join-Path $root 'release\staging\Shiyao'
 
 function Assert-NativeSuccess([string]$Step) {
     if ($LASTEXITCODE -ne 0) { throw "$Step 失败，退出码：$LASTEXITCODE" }
@@ -56,12 +56,12 @@ if (-not $SkipTests) {
     --noconfirm `
     --workpath (Join-Path $buildRoot 'work') `
     --distpath (Join-Path $buildRoot 'dist') `
-    (Join-Path $root 'packaging\semiconductor-review.spec')
+    (Join-Path $root 'packaging\shiyao.spec')
 Assert-NativeSuccess 'PyInstaller 构建'
 
-$bundle = Join-Path $buildRoot 'dist\SemiconductorReview'
-if (-not (Test-Path -LiteralPath (Join-Path $bundle 'SemiconductorReview.exe'))) {
-    throw 'PyInstaller 未生成 SemiconductorReview.exe。'
+$bundle = Join-Path $buildRoot 'dist\Shiyao'
+if (-not (Test-Path -LiteralPath (Join-Path $bundle 'Shiyao.exe'))) {
+    throw 'PyInstaller 未生成 Shiyao.exe。'
 }
 if (Test-Path -LiteralPath $staging) {
     $resolvedRelease = (Resolve-Path (Join-Path $root 'release')).Path
