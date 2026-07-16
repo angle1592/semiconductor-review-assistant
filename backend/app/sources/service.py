@@ -400,19 +400,95 @@ def _asset_count(document: SourceDocument, data_dir: Path) -> int:
     return sum(1 for path in assets.rglob("*") if path.is_file()) if assets.is_dir() else 0
 
 
+def _json_ids(value: str) -> set[str]:
+    try:
+        parsed = json.loads(value)
+        return {str(item) for item in parsed} if isinstance(parsed, list) else set()
+    except (TypeError, json.JSONDecodeError):
+        return set()
+
+
+def _dependent_analysis_records(
+    session: Session,
+    project_id: str,
+    block_ids: set[str] | None,
+) -> dict[str, list]:
+    from app.analysis.models import AnalysisBatch, AnalysisRun
+    from app.jobs.models import DurableJob
+    from app.keypoints.models import KeyPoint, KeyPointCandidate
+
+    project_runs = session.exec(
+        select(AnalysisRun).where(AnalysisRun.project_id == project_id)
+    ).all()
+    runs = [
+        run
+        for run in project_runs
+        if block_ids is None or _json_ids(run.selected_block_ids_json) & block_ids
+    ]
+    run_ids = {run.id for run in runs}
+    batches = (
+        list(session.exec(select(AnalysisBatch).where(AnalysisBatch.run_id.in_(run_ids))).all())
+        if run_ids
+        else []
+    )
+    project_candidates = session.exec(
+        select(KeyPointCandidate).where(KeyPointCandidate.project_id == project_id)
+    ).all()
+    candidates = [
+        candidate
+        for candidate in project_candidates
+        if block_ids is None
+        or candidate.run_id in run_ids
+        or _json_ids(candidate.source_block_ids_json) & block_ids
+    ]
+    project_points = session.exec(select(KeyPoint).where(KeyPoint.project_id == project_id)).all()
+    keypoints = [
+        point
+        for point in project_points
+        if block_ids is None or _json_ids(point.source_block_ids_json) & block_ids
+    ]
+    jobs: list[DurableJob] = []
+    if run_ids:
+        for job in session.exec(select(DurableJob)).all():
+            try:
+                payload = json.loads(job.payload_json)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if payload.get("run_id") in run_ids:
+                jobs.append(job)
+    return {
+        "candidates": list(candidates),
+        "keypoints": list(keypoints),
+        "batches": batches,
+        "runs": list(runs),
+        "jobs": jobs,
+    }
+
+
+def _delete_dependencies(session: Session, dependencies: dict[str, list]) -> None:
+    for name in ("candidates", "keypoints", "batches", "jobs", "runs"):
+        for record in dependencies[name]:
+            session.delete(record)
+
+
 def source_deletion_impact(
     session: Session,
     source_id: int,
     data_dir: Path,
 ) -> DeletionImpact:
     document = get_source(session, source_id)
-    block_count = session.exec(
-        select(func.count()).select_from(SourceBlock).where(SourceBlock.document_id == source_id)
-    ).one()
+    blocks = session.exec(select(SourceBlock).where(SourceBlock.document_id == source_id)).all()
+    dependencies = _dependent_analysis_records(
+        session,
+        document.project_id,
+        {block.id for block in blocks},
+    )
     return DeletionImpact(
         sources=1,
-        blocks=int(block_count),
+        blocks=len(blocks),
         preview_assets=_asset_count(document, data_dir),
+        candidates=len(dependencies["candidates"]),
+        generated_artifacts=len(dependencies["keypoints"]),
     )
 
 
@@ -426,10 +502,20 @@ def project_deletion_impact(
     documents = session.exec(
         select(SourceDocument).where(SourceDocument.project_id == project_id)
     ).all()
-    impact = DeletionImpact()
-    for document in documents:
-        impact += source_deletion_impact(session, document.id, data_dir)
-    return impact
+    document_ids = [document.id for document in documents]
+    blocks = (
+        session.exec(select(SourceBlock).where(SourceBlock.document_id.in_(document_ids))).all()
+        if document_ids
+        else []
+    )
+    dependencies = _dependent_analysis_records(session, project_id, None)
+    return DeletionImpact(
+        sources=len(documents),
+        blocks=len(blocks),
+        preview_assets=sum(_asset_count(document, data_dir) for document in documents),
+        candidates=len(dependencies["candidates"]),
+        generated_artifacts=len(dependencies["keypoints"]),
+    )
 
 
 def _stage_for_deletion(source_root: Path, runtime_dir: Path) -> tuple[Path, Path] | None:
@@ -467,6 +553,12 @@ def delete_source(
     staged = _stage_for_deletion(_source_root(document, data_dir), runtime_dir)
     try:
         blocks = session.exec(select(SourceBlock).where(SourceBlock.document_id == source_id)).all()
+        dependencies = _dependent_analysis_records(
+            session,
+            document.project_id,
+            {block.id for block in blocks},
+        )
+        _delete_dependencies(session, dependencies)
         for block in blocks:
             session.delete(block)
         session.delete(document)
@@ -493,6 +585,8 @@ def delete_project_cascade(
     project_root = data_dir / "sources" / project_id
     staged = _stage_for_deletion(project_root, runtime_dir)
     try:
+        dependencies = _dependent_analysis_records(session, project_id, None)
+        _delete_dependencies(session, dependencies)
         documents = session.exec(
             select(SourceDocument).where(SourceDocument.project_id == project_id)
         ).all()

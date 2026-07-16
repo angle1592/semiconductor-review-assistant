@@ -64,6 +64,10 @@ class AnalysisWorkerHandler:
         process_analysis_batches(self.engine, run_id, self._process_batch)
         with Session(self.engine) as session:
             run = session.get(AnalysisRun, run_id)
+            if run is not None and run.status in {"succeeded", "partial"}:
+                from app.keypoints.service import materialize_run_candidates
+
+                materialize_run_candidates(session, run_id)
             return "cancelled" if run is not None and run.status == "cancelled" else None
 
     def on_terminal_failure(

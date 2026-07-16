@@ -337,7 +337,7 @@ def test_schedule_blocks_image_analysis_until_vision_probe_passes(tmp_path: Path
             )
 
     assert caught.value.code == "MODEL_VISION_NOT_VALIDATED"
-    assert caught.value.action == "probe_model"
+    assert caught.value.action == "choose_vision_model"
 
 
 def test_terminal_worker_failure_marks_run_and_batch_failed_without_cache(tmp_path: Path):

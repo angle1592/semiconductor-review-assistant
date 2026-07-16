@@ -10,6 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.backup.router import router as backup_router
+from app.analysis.router import router as analysis_router
+from app.keypoints.router import router as keypoints_router
 from app.providers.credentials import SecretStore, WindowsKeyringSecretStore
 from app.providers.router import router as providers_router
 from app.providers.service import AdapterFactory, ProviderProfileService, default_adapter_factory
@@ -36,6 +38,9 @@ def create_app(
     provider_adapter_factory: AdapterFactory = default_adapter_factory,
     frontend_dist_dir: str | Path | None = None,
     source_max_bytes: int = DEFAULT_SOURCE_MAX_BYTES,
+    analysis_warning_blocks: int = 500,
+    analysis_batch_characters: int = 12000,
+    analysis_batch_images: int = 8,
 ) -> FastAPI:
     resolved_data_dir = Path(data_dir).resolve()
 
@@ -61,6 +66,9 @@ def create_app(
     app.state.packaged = False
     app.state.database = create_database(resolved_data_dir)
     app.state.source_max_bytes = source_max_bytes
+    app.state.analysis_warning_blocks = analysis_warning_blocks
+    app.state.analysis_batch_characters = analysis_batch_characters
+    app.state.analysis_batch_images = analysis_batch_images
     app.state.source_parsing_service = SourceParsingService(
         ParseCache(app.state.paths.runtime / "parse-cache")
     )
@@ -103,6 +111,8 @@ def create_app(
     app.add_exception_handler(Exception, unexpected_error_handler)
     app.include_router(projects_router)
     app.include_router(sources_router)
+    app.include_router(analysis_router)
+    app.include_router(keypoints_router)
     app.include_router(providers_router)
     app.include_router(backup_router)
     app.include_router(system_router)

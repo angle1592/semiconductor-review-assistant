@@ -68,8 +68,8 @@ def test_phase_one_database_upgrades_through_provider_source_and_job_schemas(tmp
 
     migrate_database(database_path, tmp_path / "Backups")
 
-    assert CURRENT_DATABASE_VERSION == 5
-    assert _user_version(database_path) == 5
+    assert CURRENT_DATABASE_VERSION == 6
+    assert _user_version(database_path) == 6
     with sqlite3.connect(database_path) as connection:
         tables = {
             row[0]
@@ -92,6 +92,8 @@ def test_phase_one_database_upgrades_through_provider_source_and_job_schemas(tmp
         "durable_job",
         "analysis_run",
         "analysis_batch",
+        "keypoint_candidate",
+        "keypoint",
     } <= tables
     assert {
         "ix_source_document_project_id",
@@ -101,4 +103,6 @@ def test_phase_one_database_upgrades_through_provider_source_and_job_schemas(tmp
         "ix_durable_job_status_available_at",
         "ix_analysis_run_project_id",
         "ix_analysis_batch_run_id",
+        "ix_keypoint_candidate_run_id",
+        "ix_keypoint_project_position",
     } <= indexes

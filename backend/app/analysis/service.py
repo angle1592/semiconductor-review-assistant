@@ -186,6 +186,107 @@ def clear_analysis_caches(runtime_dir: Path) -> None:
         target.mkdir(parents=True, exist_ok=True)
 
 
+def resolve_analysis_scope(
+    session: Session,
+    project_id: str,
+    *,
+    mode: str,
+    block_ids: list[str],
+) -> list[SourceBlock]:
+    project = session.get(ReviewProject, project_id)
+    if project is None:
+        raise NotFoundError("Review project", project_id)
+    documents = session.exec(
+        select(SourceDocument).where(SourceDocument.project_id == project_id)
+    ).all()
+    if mode == "all_sources":
+        not_ready = [
+            document.original_name
+            for document in documents
+            if document.parse_status not in {"ready", "degraded"}
+        ]
+        if not_ready:
+            raise AppError(
+                code="SOURCE_NOT_READY",
+                message="部分资料仍未完成解析，请等待解析结束后再分析。",
+                status_code=409,
+                action="wait_for_parsing",
+                context={"filenames": not_ready},
+            )
+        document_ids = [document.id for document in documents]
+        blocks = (
+            session.exec(
+                select(SourceBlock)
+                .where(SourceBlock.document_id.in_(document_ids))
+                .order_by(SourceBlock.document_id, SourceBlock.ordinal)
+            ).all()
+            if document_ids
+            else []
+        )
+    else:
+        blocks = _selected_project_blocks(session, project_id, block_ids)
+        selected_document_ids = {block.document_id for block in blocks}
+        not_ready = [
+            document.original_name
+            for document in documents
+            if document.id in selected_document_ids
+            and document.parse_status not in {"ready", "degraded"}
+        ]
+        if not_ready:
+            raise AppError(
+                code="SOURCE_NOT_READY",
+                message="所选资料仍未完成解析，请稍后重试。",
+                status_code=409,
+                action="wait_for_parsing",
+                context={"filenames": not_ready},
+            )
+    if not blocks:
+        raise AppError(
+            code="ANALYSIS_RANGE_EMPTY",
+            message="当前范围没有可分析的内容块。",
+            status_code=422,
+            action="select_source_blocks",
+        )
+    return list(blocks)
+
+
+def estimate_analysis_range(
+    session: Session,
+    project_id: str,
+    *,
+    mode: str,
+    block_ids: list[str],
+    warning_blocks: int,
+) -> dict[str, object]:
+    blocks = resolve_analysis_scope(
+        session,
+        project_id,
+        mode=mode,
+        block_ids=block_ids,
+    )
+    document_ids = {block.document_id for block in blocks}
+    documents = session.exec(
+        select(SourceDocument).where(SourceDocument.id.in_(document_ids))
+    ).all()
+    image_count = sum(
+        bool(block.asset_path)
+        or (
+            block.page_number is not None
+            and next(document for document in documents if document.id == block.document_id).extension
+            in {".pdf", ".ppt", ".pptx"}
+        )
+        for block in blocks
+    )
+    return {
+        "source_count": len(document_ids),
+        "block_count": len(blocks),
+        "page_count": sum(document.page_count or 0 for document in documents),
+        "character_count": sum(len(block.text) for block in blocks),
+        "image_count": image_count,
+        "exceeds_warning": len(blocks) > warning_blocks,
+    }
+
+
 def _selected_project_blocks(
     session: Session,
     project_id: str,
@@ -244,7 +345,7 @@ def schedule_analysis(
             code="PROVIDER_NOT_ENABLED",
             message="所选第三方服务尚未启用。",
             status_code=409,
-            action="validate_provider",
+            action="open_provider_settings",
         )
     model = session.get(ModelProfile, model_profile_id)
     if model is None or model.provider_id != provider_id:
@@ -254,7 +355,7 @@ def schedule_analysis(
             code="MODEL_CAPABILITY_NOT_VALIDATED",
             message="所选模型尚未通过结构化输出校验。",
             status_code=409,
-            action="probe_model",
+            action="open_provider_settings",
         )
     blocks = _selected_project_blocks(session, project_id, selected_block_ids)
     documents = {
@@ -279,7 +380,7 @@ def schedule_analysis(
             code="MODEL_VISION_NOT_VALIDATED",
             message="所选内容包含图片或页面预览，但模型尚未通过视觉能力校验。",
             status_code=409,
-            action="probe_model",
+            action="choose_vision_model",
         )
     batches = batch_source_blocks(
         blocks,
@@ -307,3 +408,39 @@ def schedule_analysis(
     job = enqueue_job(session, "analysis_run", {"run_id": run.id})
     session.refresh(run)
     return run, job
+
+
+def retry_failed_batches(session: Session, run_id: int):
+    from app.analysis.models import AnalysisBatch, AnalysisRun
+
+    run = session.get(AnalysisRun, run_id)
+    if run is None:
+        raise NotFoundError("Analysis run", str(run_id))
+    failed = session.exec(
+        select(AnalysisBatch).where(
+            AnalysisBatch.run_id == run_id,
+            AnalysisBatch.status == "failed",
+        )
+    ).all()
+    if not failed:
+        raise AppError(
+            code="NO_FAILED_BATCHES",
+            message="当前任务没有可重试的失败批次。",
+            status_code=409,
+            action="create_new_analysis",
+        )
+    for batch in failed:
+        batch.status = "queued"
+        batch.public_error_code = None
+        batch.error_detail = None
+        session.add(batch)
+    run.status = "queued"
+    run.failed_batches = 0
+    run.cancellation_requested = False
+    run.public_error_code = None
+    run.error_detail = None
+    session.add(run)
+    session.flush()
+    job = enqueue_job(session, "analysis_run", {"run_id": run.id})
+    session.refresh(run)
+    return run, job, [batch.id for batch in failed]

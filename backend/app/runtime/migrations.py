@@ -8,7 +8,7 @@ from pathlib import Path
 from app.runtime.identity import APPLICATION_ID
 
 
-CURRENT_DATABASE_VERSION = 5
+CURRENT_DATABASE_VERSION = 6
 MIGRATION_BACKUP_LIMIT = 5
 
 
@@ -215,12 +215,64 @@ def _migrate_to_v5(connection: sqlite3.Connection) -> None:
                 connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
+def _migrate_to_v6(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS keypoint_candidate (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            run_id INTEGER NOT NULL REFERENCES analysis_run(id),
+            batch_id INTEGER NOT NULL REFERENCES analysis_batch(id),
+            ordinal INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            explanation TEXT NOT NULL,
+            importance TEXT NOT NULL,
+            source_block_ids_json TEXT NOT NULL,
+            evidence_quotes_json TEXT NOT NULL,
+            rationale TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            user_edited INTEGER NOT NULL DEFAULT 0,
+            confirmed_keypoint_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_keypoint_candidate_run_batch_ordinal
+            ON keypoint_candidate(run_id, batch_id, ordinal);
+        CREATE INDEX IF NOT EXISTS ix_keypoint_candidate_project_id
+            ON keypoint_candidate(project_id);
+        CREATE INDEX IF NOT EXISTS ix_keypoint_candidate_run_id
+            ON keypoint_candidate(run_id);
+        CREATE TABLE IF NOT EXISTS keypoint (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            title TEXT NOT NULL,
+            explanation TEXT NOT NULL,
+            importance TEXT NOT NULL,
+            source_block_ids_json TEXT NOT NULL DEFAULT '[]',
+            evidence_quotes_json TEXT NOT NULL DEFAULT '[]',
+            origin TEXT NOT NULL DEFAULT 'manual',
+            run_id INTEGER,
+            user_edited INTEGER NOT NULL DEFAULT 0,
+            fingerprint TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_keypoint_project_fingerprint
+            ON keypoint(project_id, fingerprint);
+        CREATE INDEX IF NOT EXISTS ix_keypoint_project_position
+            ON keypoint(project_id, position);
+        """
+    )
+
+
 MIGRATIONS = {
     1: _migrate_to_v1,
     2: _migrate_to_v2,
     3: _migrate_to_v3,
     4: _migrate_to_v4,
     5: _migrate_to_v5,
+    6: _migrate_to_v6,
 }
 
 
