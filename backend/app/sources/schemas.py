@@ -94,6 +94,7 @@ class DeletionImpact(BaseModel):
     blocks: int = 0
     preview_assets: int = 0
     candidates: int = 0
+    source_questions: int = 0
     generated_artifacts: int = 0
 
     def __add__(self, other: "DeletionImpact") -> "DeletionImpact":

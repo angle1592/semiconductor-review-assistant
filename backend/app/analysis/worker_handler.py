@@ -66,8 +66,10 @@ class AnalysisWorkerHandler:
             run = session.get(AnalysisRun, run_id)
             if run is not None and run.status in {"succeeded", "partial"}:
                 from app.keypoints.service import materialize_run_candidates
+                from app.study.service import materialize_run_source_questions
 
                 materialize_run_candidates(session, run_id)
+                materialize_run_source_questions(session, run_id)
             return "cancelled" if run is not None and run.status == "cancelled" else None
 
     def on_terminal_failure(

@@ -8,7 +8,7 @@ from pathlib import Path
 from app.runtime.identity import APPLICATION_ID
 
 
-CURRENT_DATABASE_VERSION = 6
+CURRENT_DATABASE_VERSION = 7
 MIGRATION_BACKUP_LIMIT = 5
 
 
@@ -266,6 +266,54 @@ def _migrate_to_v6(connection: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_to_v7(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS source_question (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            document_id INTEGER NOT NULL REFERENCES source_document(id),
+            question_text TEXT NOT NULL,
+            answer_text TEXT,
+            source_block_ids_json TEXT NOT NULL,
+            evidence_quotes_json TEXT NOT NULL DEFAULT '[]',
+            fingerprint TEXT NOT NULL,
+            user_edited INTEGER NOT NULL DEFAULT 0,
+            archived INTEGER NOT NULL DEFAULT 0,
+            run_id INTEGER REFERENCES analysis_run(id),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_source_question_document_fingerprint
+            ON source_question(document_id, fingerprint);
+        CREATE INDEX IF NOT EXISTS ix_source_question_project_id ON source_question(project_id);
+        CREATE TABLE IF NOT EXISTS generated_artifact (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            kind TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'queued',
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            keypoint_ids_json TEXT NOT NULL,
+            source_question_ids_json TEXT NOT NULL DEFAULT '[]',
+            provider_id TEXT NOT NULL,
+            provider_config_generation INTEGER NOT NULL,
+            provider_protocol TEXT NOT NULL,
+            provider_base_url TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            prompt_snapshot TEXT NOT NULL,
+            prompt_hash TEXT NOT NULL,
+            cache_status TEXT,
+            public_error_code TEXT,
+            error_detail TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_generated_artifact_project_kind
+            ON generated_artifact(project_id, kind);
+        """
+    )
+
+
 MIGRATIONS = {
     1: _migrate_to_v1,
     2: _migrate_to_v2,
@@ -273,6 +321,7 @@ MIGRATIONS = {
     4: _migrate_to_v4,
     5: _migrate_to_v5,
     6: _migrate_to_v6,
+    7: _migrate_to_v7,
 }
 
 

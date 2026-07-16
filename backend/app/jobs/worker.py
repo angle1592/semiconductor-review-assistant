@@ -74,6 +74,7 @@ def main() -> None:
     from app.analysis.worker_handler import AnalysisWorkerHandler
     from app.providers.credentials import WindowsKeyringSecretStore
     from app.providers.service import default_adapter_factory
+    from app.study.worker_handler import ArtifactWorkerHandler
 
     paths = AppPaths.discover()
     paths.ensure_directories()
@@ -85,7 +86,16 @@ def main() -> None:
         default_adapter_factory,
         data_dir=paths.data,
     )
-    worker = DurableWorker(engine, {"analysis_run": analysis_handler})
+    artifact_handler = ArtifactWorkerHandler(
+        engine,
+        paths.runtime,
+        WindowsKeyringSecretStore(),
+        default_adapter_factory,
+    )
+    worker = DurableWorker(
+        engine,
+        {"analysis_run": analysis_handler, "artifact_generation": artifact_handler},
+    )
     stop_file_value = os.getenv("SHIYAO_WORKER_STOP_FILE", "")
     stop_file = Path(stop_file_value).resolve() if stop_file_value else None
     poll_seconds = float(os.getenv("SHIYAO_WORKER_POLL_SECONDS", "0.5"))

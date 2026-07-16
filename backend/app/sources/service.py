@@ -416,6 +416,7 @@ def _dependent_analysis_records(
     from app.analysis.models import AnalysisBatch, AnalysisRun
     from app.jobs.models import DurableJob
     from app.keypoints.models import KeyPoint, KeyPointCandidate
+    from app.study.models import GeneratedArtifact, SourceQuestion
 
     project_runs = session.exec(
         select(AnalysisRun).where(AnalysisRun.project_id == project_id)
@@ -447,6 +448,26 @@ def _dependent_analysis_records(
         for point in project_points
         if block_ids is None or _json_ids(point.source_block_ids_json) & block_ids
     ]
+    project_questions = session.exec(
+        select(SourceQuestion).where(SourceQuestion.project_id == project_id)
+    ).all()
+    questions = [
+        question
+        for question in project_questions
+        if block_ids is None or _json_ids(question.source_block_ids_json) & block_ids
+    ]
+    question_ids = {question.id for question in questions}
+    keypoint_ids = {point.id for point in keypoints}
+    project_artifacts = session.exec(
+        select(GeneratedArtifact).where(GeneratedArtifact.project_id == project_id)
+    ).all()
+    artifacts = [
+        artifact
+        for artifact in project_artifacts
+        if block_ids is None
+        or _json_ids(artifact.keypoint_ids_json) & {str(value) for value in keypoint_ids}
+        or _json_ids(artifact.source_question_ids_json) & {str(value) for value in question_ids}
+    ]
     jobs: list[DurableJob] = []
     if run_ids:
         for job in session.exec(select(DurableJob)).all():
@@ -456,9 +477,13 @@ def _dependent_analysis_records(
                 continue
             if payload.get("run_id") in run_ids:
                 jobs.append(job)
+            if payload.get("artifact_id") in {artifact.id for artifact in artifacts}:
+                jobs.append(job)
     return {
         "candidates": list(candidates),
         "keypoints": list(keypoints),
+        "questions": list(questions),
+        "artifacts": list(artifacts),
         "batches": batches,
         "runs": list(runs),
         "jobs": jobs,
@@ -466,7 +491,7 @@ def _dependent_analysis_records(
 
 
 def _delete_dependencies(session: Session, dependencies: dict[str, list]) -> None:
-    for name in ("candidates", "keypoints", "batches", "jobs", "runs"):
+    for name in ("artifacts", "questions", "candidates", "keypoints", "batches", "jobs", "runs"):
         for record in dependencies[name]:
             session.delete(record)
 
@@ -488,7 +513,8 @@ def source_deletion_impact(
         blocks=len(blocks),
         preview_assets=_asset_count(document, data_dir),
         candidates=len(dependencies["candidates"]),
-        generated_artifacts=len(dependencies["keypoints"]),
+        source_questions=len(dependencies["questions"]),
+        generated_artifacts=len(dependencies["keypoints"]) + len(dependencies["artifacts"]),
     )
 
 
@@ -514,7 +540,8 @@ def project_deletion_impact(
         blocks=len(blocks),
         preview_assets=sum(_asset_count(document, data_dir) for document in documents),
         candidates=len(dependencies["candidates"]),
-        generated_artifacts=len(dependencies["keypoints"]),
+        source_questions=len(dependencies["questions"]),
+        generated_artifacts=len(dependencies["keypoints"]) + len(dependencies["artifacts"]),
     )
 
 

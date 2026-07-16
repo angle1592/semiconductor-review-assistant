@@ -7,6 +7,8 @@ import shutil
 import tempfile
 from typing import Any
 
+from pydantic import BaseModel
+
 from app.analysis.schemas import AnalysisBatchResult
 
 
@@ -50,8 +52,9 @@ class AIResultCache:
         "cache_creation_input_tokens",
     }
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, result_type: type[BaseModel] = AnalysisBatchResult):
         self.root = root.resolve()
+        self.result_type = result_type
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _result_path(self, key: str) -> Path:
@@ -74,13 +77,13 @@ class AIResultCache:
         finally:
             temporary.unlink(missing_ok=True)
 
-    def load(self, key: str) -> AnalysisBatchResult | None:
+    def load(self, key: str) -> BaseModel | None:
         path = self._result_path(key)
         if not path.is_file():
             return None
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-            return AnalysisBatchResult.model_validate(payload["result"])
+            return self.result_type.model_validate(payload["result"])
         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             path.unlink(missing_ok=True)
             return None
@@ -88,7 +91,7 @@ class AIResultCache:
     def store(
         self,
         key: str,
-        result: AnalysisBatchResult,
+        result: BaseModel,
         *,
         status: str,
         metadata: dict[str, Any],

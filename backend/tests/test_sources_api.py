@@ -88,6 +88,7 @@ def test_source_lifecycle_and_exact_parse_cache(tmp_path: Path):
             "blocks": 3,
             "preview_assets": 0,
             "candidates": 0,
+            "source_questions": 0,
             "generated_artifacts": 0,
         }
 
