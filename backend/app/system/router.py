@@ -20,8 +20,7 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 
 
 def _setup_complete(request: Request) -> bool:
-    settings = request.app.state.ai_settings_service.get()
-    return bool(settings.model.strip() and settings.base_url.strip() and settings.api_key_configured)
+    return False
 
 
 @router.get("/info", response_model=SystemInfo)
@@ -58,7 +57,7 @@ def open_system_path(kind: str, request: Request) -> Response:
 
 @router.get("/diagnostics")
 def diagnostics(request: Request) -> StreamingResponse:
-    settings = request.app.state.ai_settings_service.get().model_dump()
+    settings = {"provider_setup": "not_enabled"}
     content = create_diagnostics(
         request.app.state.paths,
         packaged=bool(getattr(request.app.state, "packaged", False)),

@@ -5,7 +5,7 @@ from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 
-from app.ai.secrets import MemorySecretStore
+from app.providers.credentials import MemorySecretStore
 from app.main import create_app
 from app.runtime.paths import AppPaths
 

@@ -9,10 +9,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.ai.router import router as ai_router
-from app.ai.secrets import SecretStore, WindowsKeyringSecretStore
-from app.ai.settings import AISettingsService, ProviderFactory, default_provider_factory
 from app.backup.router import router as backup_router
+from app.providers.credentials import SecretStore, WindowsKeyringSecretStore
+from app.providers.service import ProviderProfileService
 from app.projects.router import router as projects_router
 from app.shared.database import create_database
 from app.shared.errors import AppError, app_error_handler, unexpected_error_handler
@@ -30,7 +29,6 @@ def create_app(
     data_dir: str | Path,
     *,
     secret_store: SecretStore | None = None,
-    ai_provider_factory: ProviderFactory = default_provider_factory,
     frontend_dist_dir: str | Path | None = None,
 ) -> FastAPI:
     resolved_data_dir = Path(data_dir).resolve()
@@ -54,11 +52,8 @@ def create_app(
     )
     app.state.packaged = False
     app.state.database = create_database(resolved_data_dir)
-    app.state.ai_settings_service = AISettingsService(
-        app.state.database,
-        resolved_data_dir,
-        secret_store or WindowsKeyringSecretStore(),
-        ai_provider_factory,
+    app.state.provider_profile_service = ProviderProfileService(
+        app.state.database, secret_store or WindowsKeyringSecretStore()
     )
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
@@ -94,7 +89,6 @@ def create_app(
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)
     app.include_router(projects_router)
-    app.include_router(ai_router)
     app.include_router(backup_router)
     app.include_router(system_router)
 
