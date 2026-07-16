@@ -1,51 +1,40 @@
-import { cleanup, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App'
 
 
-describe('desktop settings controls', () => {
-  afterEach(() => {
-    cleanup()
-    vi.unstubAllGlobals()
-  })
+afterEach(() => vi.unstubAllGlobals())
 
-  it('opens only the requested local directory', async () => {
-    const user = userEvent.setup()
-    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.endsWith('/api/settings/ai')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            provider: 'openai_compatible',
-            base_url: 'https://api.openai.com/v1',
-            model: 'gpt-4.1-mini',
-            api_key_configured: false,
-            vision_enabled: true,
-          }),
-        }
+it('shows only third-party API configuration', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.endsWith('/api/settings/ai')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          provider: 'openai_compatible',
+          base_url: 'https://api.example/v1',
+          model: 'review-model',
+          api_key_configured: true,
+          vision_enabled: true,
+        }),
       }
-      if (url.endsWith('/api/system/paths/logs/open')) return { ok: true, status: 204 }
-      throw new Error(`Unexpected request: ${url}`)
-    })
-    vi.stubGlobal('fetch', fetchMock)
+    }
+    if (url.endsWith('/api/system/info')) {
+      return { ok: true, status: 200, json: async () => ({ application: 'shiyao-review', version: '0.1.0', packaged: false, setup_complete: true, data_directory: 'data', log_directory: 'logs' }) }
+    }
+    throw new Error(`Unexpected request: ${url}`)
+  }))
 
-    render(
-      <MemoryRouter initialEntries={['/settings']}>
-        <AppRoutes />
-      </MemoryRouter>,
-    )
+  render(
+    <MemoryRouter initialEntries={['/settings']}>
+      <AppRoutes />
+    </MemoryRouter>,
+  )
 
-    await user.click(await screen.findByRole('button', { name: '打开日志目录' }))
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/system/paths/logs/open'),
-      expect.objectContaining({ method: 'POST' }),
-    )
-    expect(screen.getByRole('button', { name: '导出诊断包' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '退出本地服务' })).toBeInTheDocument()
-  })
+  expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument()
+  expect(screen.getByText('OpenAI 兼容 API')).toBeInTheDocument()
 })

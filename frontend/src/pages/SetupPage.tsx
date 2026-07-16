@@ -1,85 +1,51 @@
-import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Bot, ChevronDown, KeyRound, ShieldCheck } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { api, type AISettings } from '../api/client'
-
-
-type SetupForm = AISettings & { api_key: string }
-
-const initialForm: SetupForm = {
-  provider: 'openai_compatible',
-  base_url: 'https://api.openai.com/v1',
-  model: '',
-  api_key: '',
-  vision_enabled: true,
-}
-
+import { api, type AISettingsInput } from '../api/client'
 
 export function SetupPage() {
   const navigate = useNavigate()
-  const [form, setForm] = useState(initialForm)
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  const save = useMutation({
-    mutationFn: async (settings: SetupForm) => {
-      const result = await api.testAISettings(settings)
-      if (!result.ok) throw new Error(result.message || '连接测试失败')
-      await api.saveAISettings(settings)
+  const [draft, setDraft] = useState<AISettingsInput>({ provider: 'openai_compatible', base_url: 'https://api.openai.com/v1', model: '', vision_enabled: true })
+  const [apiKey, setApiKey] = useState('')
+  const [message, setMessage] = useState('')
+  const configure = useMutation({
+    mutationFn: async () => {
+      const payload = { ...draft, api_key: apiKey || undefined }
+      const tested = await api.testAISettings(payload)
+      if (!tested.ok) throw new Error(tested.message || '连接校验未通过')
+      await api.saveAISettings(payload)
       await api.completeSetup()
     },
-    onSuccess: () => navigate('/', { replace: true }),
+    onSuccess: () => { setApiKey(''); navigate('/projects') },
+    onError: (error: Error) => setMessage(`设置未完成：${error.message}`),
   })
 
-  function update<K extends keyof SetupForm>(key: K, value: SetupForm[K]) {
-    setForm((current) => ({ ...current, [key]: value }))
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    setMessage('')
+    configure.mutate()
   }
 
   return (
-    <div className="setup-page">
-      <div className="setup-mark"><Bot aria-hidden="true" /></div>
-      <p className="eyebrow">首次使用 · 约 1 分钟</p>
-      <h1>先连接你的 AI 服务</h1>
-      <p className="setup-intro">每位使用者填写自己的服务地址、模型和密钥。密钥只进入 Windows 凭据存储，不写入课程数据库或备份。</p>
-
-      <form className="settings-form setup-form" onSubmit={(event) => { event.preventDefault(); save.mutate(form) }}>
-        {form.provider === 'openai_compatible' ? (
-          <div className="form-grid">
-            <label>服务地址
-              <input value={form.base_url} onChange={(event) => update('base_url', event.target.value)} required />
-            </label>
-            <label>模型名称
-              <input value={form.model} onChange={(event) => update('model', event.target.value)} placeholder="例如 gpt-4.1-mini" required />
-            </label>
-            <label className="form-span">API Key
-              <div className="secret-input"><KeyRound aria-hidden="true" /><input type="password" value={form.api_key} onChange={(event) => update('api_key', event.target.value)} autoComplete="off" required /></div>
-            </label>
-            <label className="check-row form-span">
-              <input type="checkbox" checked={form.vision_enabled ?? true} onChange={(event) => update('vision_enabled', event.target.checked)} />
-              <span><strong>允许处理所选课件页面图片</strong><small>只有你在课次中选择的页面会发送给当前服务。</small></span>
-            </label>
-          </div>
-        ) : (
-          <div className="advanced-provider">
-            <Bot aria-hidden="true" />
-            <div><h2>使用本机 Codex 登录</h2><p>高级选项。复用这台电脑已有的 Codex 认证，不复制凭据。</p></div>
-            <label>模型名称<input value={form.model} onChange={(event) => update('model', event.target.value)} placeholder="gpt-5.2-codex" required /></label>
-          </div>
-        )}
-
-        {save.isError && <div className="notice notice--error" role="alert">{save.error instanceof Error ? save.error.message : '设置未保存，请检查本地服务后重试。'}</div>}
-        <div className="setup-actions">
-          <button className="button button--primary button--large" type="submit" disabled={save.isPending}>{save.isPending ? '正在测试并保存…' : '测试、保存并进入复习台'}</button>
-          <button className="button button--ghost" type="button" onClick={() => setShowAdvanced((value) => !value)}><ChevronDown aria-hidden="true" />高级：使用 Codex</button>
-        </div>
-        {showAdvanced && (
-          <button className="advanced-choice" type="button" onClick={() => update('provider', form.provider === 'codex' ? 'openai_compatible' : 'codex')}>
-            <strong>使用本机 Codex 登录</strong><span>{form.provider === 'codex' ? '切回 OpenAI 兼容 API' : '选择高级后端'}</span>
-          </button>
-        )}
+    <section className="setup-page">
+      <div className="setup-intro">
+        <span className="brand-bookmark brand-bookmark--large" aria-hidden="true"><b>拾</b><b>要</b></span>
+        <p className="eyebrow">首次设置</p>
+        <h1>连接你的第三方 AI</h1>
+        <p>拾要需要 AI 从 PPT、Word 等资料中识别重点。我们会先实际校验连接，成功后才保存并继续。</p>
+        <ul><li><ShieldCheck /> API Key 写入系统凭证库</li><li><CheckCircle2 /> 页面不会回显已保存的密钥</li></ul>
+      </div>
+      <form className="setup-form" onSubmit={submit}>
+        <div><span className="step-label">01 / 接口</span><h2>OpenAI 兼容 API</h2><p>填写服务商给出的接口地址、模型 ID 和密钥。</p></div>
+        <label>API 地址<input required value={draft.base_url} onChange={(event) => setDraft({ ...draft, base_url: event.target.value })} placeholder="https://api.example.com/v1" /></label>
+        <label>模型名称<input required value={draft.model} onChange={(event) => setDraft({ ...draft, model: event.target.value })} placeholder="例如：provider-model-id" /></label>
+        <label>API Key<input required type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} /></label>
+        <label className="check-row"><input type="checkbox" checked={draft.vision_enabled} onChange={(event) => setDraft({ ...draft, vision_enabled: event.target.checked })} /><span><strong>允许视觉理解</strong><small>建议开启，用于识别资料里的图表和扫描页。</small></span></label>
+        {message && <p className="form-error" role="alert">{message}</p>}
+        <button className="button button--primary setup-submit" disabled={configure.isPending} type="submit">{configure.isPending ? '正在校验连接…' : '测试、保存并继续'} <ArrowRight /></button>
       </form>
-
-      <div className="privacy-strip"><ShieldCheck aria-hidden="true" /><p><strong>正式学习数据只保存在本机。</strong> 以后可在设置页随时更换后端、导出备份或诊断包。</p></div>
-    </div>
+    </section>
   )
 }

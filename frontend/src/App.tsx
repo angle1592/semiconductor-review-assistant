@@ -1,79 +1,66 @@
-import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BarChart3, BookOpen, CircuitBoard, Home, PlayCircle, Settings2, type LucideIcon } from 'lucide-react'
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { Archive, Brain, ListChecks, Settings } from 'lucide-react'
+import { useState } from 'react'
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 
-import { CourseDetailPage } from './pages/CourseDetailPage'
-import { CoursesPage } from './pages/CoursesPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { LessonPage } from './pages/LessonPage'
-import { ProgressPage } from './pages/ProgressPage'
+import { MasteryPage } from './pages/MasteryPage'
+import { ProjectDetailPage } from './pages/ProjectDetailPage'
+import { ProjectsPage } from './pages/ProjectsPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SetupPage } from './pages/SetupPage'
 
-const navigation: ReadonlyArray<{ to: string; label: string; icon: LucideIcon; end?: boolean }> = [
-  { to: '/', label: '首页', icon: Home, end: true },
-  { to: '/courses', label: '课程', icon: BookOpen },
-  { to: '/review', label: '开始复习', icon: PlayCircle },
-  { to: '/progress', label: '掌握进度', icon: BarChart3 },
-  { to: '/settings', label: '设置', icon: Settings2 },
+const navigation = [
+  { to: '/projects', label: '项目', icon: Archive },
+  { to: '/review', label: '开始复习', icon: ListChecks },
+  { to: '/mastery', label: '掌握情况', icon: Brain },
+  { to: '/settings', label: '设置', icon: Settings },
 ]
 
 function AppShell() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <NavLink className="brand" to="/" aria-label="半导体复习台首页">
-          <span className="brand-mark"><CircuitBoard aria-hidden="true" /></span>
-          <span><strong>回片</strong><small>半导体复习台</small></span>
+        <NavLink to="/" className="brand" aria-label="拾要首页">
+          <span className="brand-bookmark" aria-hidden="true"><b>拾</b><b>要</b></span>
+          <span className="brand-copy">
+            <strong>拾要</strong>
+            <small>从资料中拾取真正重要的内容</small>
+          </span>
         </NavLink>
         <nav className="primary-nav" aria-label="主导航">
-          {navigation.map(({ to, label, icon: Icon, end }) => (
-            <NavLink className={({ isActive }) => isActive ? 'is-active' : ''} to={to} end={end} key={to}>
-              <Icon aria-hidden="true" /><span>{label}</span>
+          {navigation.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} className={({ isActive }) => isActive ? 'is-active' : ''}>
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-foot">
-          <span className="local-dot" aria-hidden="true" />
-          <div><strong>本机数据</strong><small>唯一权威来源</small></div>
-        </div>
+        <p className="sidebar-note"><span>本机保存</span> · 第三方 AI</p>
       </aside>
-      <main className="app-main">
+      <main className="main-content">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/courses" element={<CoursesPage />} />
-          <Route path="/courses/:id" element={<CourseDetailPage />} />
-          <Route path="/lessons/new" element={<LessonPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
           <Route path="/review" element={<ReviewPage />} />
-          <Route path="/progress" element={<ProgressPage />} />
+          <Route path="/mastery" element={<MasteryPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/setup" element={<SetupPage />} />
-          <Route path="*" element={<DashboardPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      <nav className="bottom-nav" aria-label="移动端主导航">
-        {navigation.map(({ to, label, icon: Icon, end }) => (
-          <NavLink aria-label={`移动端：${label}`} className={({ isActive }) => isActive ? 'is-active' : ''} to={to} end={end} key={to}>
-            <Icon aria-hidden="true" /><span>{label === '开始复习' ? '复习' : label}</span>
-          </NavLink>
-        ))}
-      </nav>
     </div>
   )
 }
 
 export function AppRoutes() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: { retry: false, staleTime: 15_000 },
-          mutations: { retry: false },
-        },
-      }),
-  )
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: { retry: 1, staleTime: 15_000 },
+    },
+  }))
   return (
     <QueryClientProvider client={queryClient}>
       <AppShell />
