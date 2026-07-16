@@ -12,4 +12,5 @@ regexes = [
   '''super-secret-api-key''',
   '''temporary-key''',
   '''private-test-key''',
+  '''unique-canary-key-731946''',
 ]
