@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.backup.service import create_backup, restore_backup, validate_backup
+from app.runtime.version import APPLICATION_VERSION
 
 
 router = APIRouter(prefix="/api/backups", tags=["backups"])
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/api/backups", tags=["backups"])
 
 @router.get("/export")
 def export_backup(request: Request) -> StreamingResponse:
-    content = create_backup(request.app.state.data_dir)
+    content = create_backup(request.app.state.data_dir, APPLICATION_VERSION)
     headers = {"Content-Disposition": 'attachment; filename="shiyao-backup.zip"'}
     return StreamingResponse(BytesIO(content), media_type="application/zip", headers=headers)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from contextlib import closing
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -363,7 +364,7 @@ def migrate_database(database_path: Path, backup_dir: Path) -> Path | None:
     database_path.parent.mkdir(parents=True, exist_ok=True)
     backup_dir.mkdir(parents=True, exist_ok=True)
     existed = database_path.is_file()
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         current_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         has_user_tables = _has_user_tables(connection)
         product_marker = _product_marker(connection)
@@ -385,7 +386,7 @@ def migrate_database(database_path: Path, backup_dir: Path) -> Path | None:
         backup_path = backup_dir / f"pre-migration-{timestamp}-v{current_version}.db"
         shutil.copy2(database_path, backup_path)
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         for version in range(current_version + 1, CURRENT_DATABASE_VERSION + 1):
             MIGRATIONS[version](connection)
             connection.execute(f"PRAGMA user_version={version}")

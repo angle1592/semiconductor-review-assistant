@@ -59,6 +59,11 @@ export type SystemInfo = {
   log_directory: string
 }
 
+export type CacheStats = {
+  parse: { files: number; bytes: number }
+  ai: { files: number; bytes: number }
+}
+
 export class ApiError extends Error {
   status: number
   code?: string
@@ -139,6 +144,12 @@ export const api = {
   openSystemPath: (kind: 'data' | 'backups' | 'logs') =>
     request<void>(`/api/system/paths/${kind}/open`, { method: 'POST' }),
   exportDiagnostics: () => requestBlob('/api/system/diagnostics'),
+  getCaches: () => request<CacheStats>('/api/system/caches'),
+  clearCache: (kind: 'parse' | 'ai', bytes: number) =>
+    request<{ cleared: boolean; removed: { files: number; bytes: number }; current: CacheStats }>(`/api/system/caches/${kind}/clear`, {
+      method: 'POST',
+      body: json({ expected_bytes: bytes, confirmation: `CLEAR ${bytes}` }),
+    }),
   shutdown: () => request<{ status: string }>('/api/system/shutdown', { method: 'POST' }),
 }
 

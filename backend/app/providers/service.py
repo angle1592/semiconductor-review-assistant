@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from typing import Callable
+from urllib.parse import urlsplit
 
 from sqlmodel import Session, select
 
@@ -211,4 +212,39 @@ class ProviderProfileService:
             return session.exec(select(AIProviderProfile).where(AIProviderProfile.enabled == True, AIProviderProfile.is_default == True)).first() is not None  # noqa: E712
 
     def diagnostic_summary(self) -> dict:
-        return {"providers": [{"id": item.id, "protocol": item.protocol, "enabled": item.enabled, "is_default": item.is_default, "api_key_configured": item.api_key_configured} for item in self.list()]}
+        with Session(self.engine) as session:
+            profiles = session.exec(select(AIProviderProfile)).all()
+            models = session.exec(select(ModelProfile)).all()
+        models_by_provider: dict[str, list[dict]] = {}
+        for model in models:
+            models_by_provider.setdefault(model.provider_id, []).append(
+                {
+                    "model_id": model.model_id,
+                    "text_status": model.text_status,
+                    "structured_status": model.structured_status,
+                    "vision_status": model.vision_status,
+                    "prompt_cache_status": model.prompt_cache_status,
+                    "safe_error_code": model.safe_error_code,
+                }
+            )
+        return {
+            "providers": [
+                {
+                    "protocol": profile.protocol,
+                    "host": urlsplit(profile.base_url).hostname,
+                    "enabled": profile.enabled,
+                    "is_default": profile.is_default,
+                    "models": models_by_provider.get(profile.id, []),
+                }
+                for profile in profiles
+            ]
+        }
+
+    def diagnostic_secret_values(self) -> tuple[str, ...]:
+        with Session(self.engine) as session:
+            profile_ids = session.exec(select(AIProviderProfile.id)).all()
+        return tuple(
+            value
+            for profile_id in profile_ids
+            if (value := self.secrets.get(credential_key(profile_id)))
+        )

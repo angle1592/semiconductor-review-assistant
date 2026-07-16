@@ -136,7 +136,7 @@ def test_diagnostics_archive_is_sanitized_and_excludes_learning_data(tmp_path: P
     with ZipFile(BytesIO(response.content)) as archive:
         names = archive.namelist()
         combined = b"".join(archive.read(name) for name in names)
-    assert "system.json" in names
+    assert "summary.json" in names
     assert "logs/app.log" in names
     assert not any("private-course" in name for name in names)
     assert b"sk-example-secret-value" not in combined

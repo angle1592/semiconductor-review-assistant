@@ -11,13 +11,16 @@ from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from app.shared.errors import AppError
 from app.runtime.identity import DATABASE_NAME
+from app.runtime.migrations import migrate_database
 
-_EXCLUDED_DATA_DIRECTORIES = {"backups", "restore-staged", "provider-runtime", "runtime"}
+BACKUP_FORMAT_VERSION = 2
+BACKUP_PRODUCT = "shiyao"
+_FORMAL_DATA_DIRECTORIES = {"sources", "uploads"}
 
 
 class InvalidBackupError(AppError):
     def __init__(self, message: str = "The backup archive is invalid."):
-        super().__init__(message, "INVALID_BACKUP", 422)
+        super().__init__(code="INVALID_BACKUP", message=message, status_code=422)
 
 
 def _sha256(content: bytes) -> str:
@@ -32,13 +35,30 @@ def _safe_archive_name(name: str) -> bool:
 
 
 def _data_files(data_dir: Path) -> list[Path]:
-    return sorted(
-        path
-        for path in data_dir.rglob("*")
-        if path.is_file()
-        and not _EXCLUDED_DATA_DIRECTORIES.intersection(path.relative_to(data_dir).parts)
-        and not path.name.endswith(("-wal", "-shm", "-journal"))
-    )
+    files = [data_dir / DATABASE_NAME]
+    for directory in _FORMAL_DATA_DIRECTORIES:
+        root = data_dir / directory
+        if root.is_dir():
+            files.extend(path for path in root.rglob("*") if path.is_file())
+    return sorted(path for path in files if path.is_file())
+
+
+def _sanitize_database_snapshot(path: Path) -> None:
+    if not path.is_file():
+        return
+    with closing(sqlite3.connect(path)) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if "durable_job" in tables:
+            connection.execute(
+                "UPDATE durable_job SET worker_id = NULL, lease_expires_at = NULL, "
+                "last_heartbeat_at = NULL"
+            )
+        if "ai_provider_profile" in tables:
+            connection.execute("UPDATE ai_provider_profile SET models_fetched_at = NULL")
+        connection.commit()
 
 
 def create_backup(data_dir: Path, app_version: str = "0.1.0") -> bytes:
@@ -54,6 +74,7 @@ def create_backup(data_dir: Path, app_version: str = "0.1.0") -> bytes:
             ):
                 source.backup(destination)
                 destination.commit()
+            _sanitize_database_snapshot(snapshot_path)
         for path in files:
             relative = path.relative_to(data_dir).as_posix()
             contents[relative] = (
@@ -62,7 +83,8 @@ def create_backup(data_dir: Path, app_version: str = "0.1.0") -> bytes:
                 else path.read_bytes()
             )
     manifest = {
-        "format_version": 1,
+        "format_version": BACKUP_FORMAT_VERSION,
+        "product": BACKUP_PRODUCT,
         "app_version": app_version,
         "created_at": datetime.now(UTC).isoformat(),
         "counts": {"files": len(contents)},
@@ -89,8 +111,10 @@ def validate_backup(content: bytes) -> tuple[dict, list[str]]:
             if "manifest.json" not in names:
                 raise InvalidBackupError("The backup manifest is missing.")
             manifest = json.loads(archive.read("manifest.json"))
-            if manifest.get("format_version") != 1:
+            if manifest.get("format_version") != BACKUP_FORMAT_VERSION:
                 errors.append("Unsupported backup format version.")
+            if manifest.get("product") != BACKUP_PRODUCT:
+                errors.append("Backup product does not match Shiyao.")
             if manifest.get("contains_secrets") is not False:
                 errors.append("Backup must not contain secrets.")
             checksums = manifest.get("checksums", {})
@@ -122,34 +146,49 @@ def restore_backup(content: bytes, data_dir: Path, engine) -> dict:
         raise InvalidBackupError("; ".join(errors))
     data_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="shiyao-restore-", dir=data_dir.parent) as temp:
-        stage = Path(temp)
+        working = Path(temp)
+        stage = working / "staged"
+        rollback = working / "rollback"
+        stage.mkdir()
+        rollback.mkdir()
         with ZipFile(BytesIO(content)) as archive:
             for name in archive.namelist():
                 if not name.startswith("data/") or name.endswith("/"):
                     continue
                 relative = PurePosixPath(name).relative_to("data")
-                if _EXCLUDED_DATA_DIRECTORIES.intersection(relative.parts):
+                if (
+                    relative.parts[0] != DATABASE_NAME
+                    and relative.parts[0] not in _FORMAL_DATA_DIRECTORIES
+                ):
                     continue
                 target = stage.joinpath(*relative.parts)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(archive.read(name))
+        staged_database = stage / DATABASE_NAME
+        if not staged_database.is_file():
+            raise InvalidBackupError("The backup database is missing.")
+        with closing(sqlite3.connect(staged_database)) as connection:
+            if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                raise InvalidBackupError("The backup database failed integrity validation.")
         engine.dispose()
-        for existing in _data_files(data_dir):
-            existing.unlink(missing_ok=True)
-        for source in stage.rglob("*"):
-            if not source.is_file():
-                continue
-            target = data_dir / source.relative_to(stage)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
-        for directory in sorted(
-            (path for path in data_dir.rglob("*") if path.is_dir()),
-            key=lambda path: len(path.parts),
-            reverse=True,
-        ):
-            if directory.name not in _EXCLUDED_DATA_DIRECTORIES:
-                try:
-                    directory.rmdir()
-                except OSError:
-                    pass
+        formal_targets = [
+            data_dir / DATABASE_NAME,
+            *(data_dir / name for name in _FORMAL_DATA_DIRECTORIES),
+        ]
+        try:
+            for target in formal_targets:
+                if target.exists():
+                    shutil.move(str(target), rollback / target.name)
+            for source in stage.iterdir():
+                shutil.move(str(source), data_dir / source.name)
+            migrate_database(data_dir / DATABASE_NAME, data_dir.parent / "Backups")
+        except Exception:
+            for target in formal_targets:
+                if target.is_dir():
+                    shutil.rmtree(target)
+                else:
+                    target.unlink(missing_ok=True)
+            for source in rollback.iterdir():
+                shutil.move(str(source), data_dir / source.name)
+            raise
     return manifest

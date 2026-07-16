@@ -4,12 +4,13 @@ from io import BytesIO
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from app.desktop.instance import APPLICATION_ID
+from app.diagnostics.service import cache_summary, clear_cache, create_diagnostics
 from app.runtime.version import APPLICATION_VERSION
 from app.system.schemas import SystemInfo
 from app.system.service import (
-    create_diagnostics,
     is_setup_complete,
     mark_setup_complete,
     open_directory,
@@ -17,6 +18,11 @@ from app.system.service import (
 
 
 router = APIRouter(prefix="/api/system", tags=["system"])
+
+
+class CacheClearRequest(BaseModel):
+    expected_bytes: int = Field(ge=0)
+    confirmation: str
 
 
 def _setup_complete(request: Request) -> bool:
@@ -55,13 +61,36 @@ def open_system_path(kind: str, request: Request) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/caches")
+def caches(request: Request) -> dict[str, dict[str, int]]:
+    return cache_summary(request.app.state.paths)
+
+
+@router.post("/caches/{kind}/clear")
+def clear_cache_endpoint(kind: str, payload: CacheClearRequest, request: Request) -> dict:
+    try:
+        removed = clear_cache(
+            request.app.state.paths,
+            kind,
+            expected_bytes=payload.expected_bytes,
+            confirmation=payload.confirmation,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=409,
+            detail="缓存大小已变化或确认信息不匹配，请刷新后重试。",
+        ) from error
+    return {"cleared": True, "removed": removed, "current": cache_summary(request.app.state.paths)}
+
+
 @router.get("/diagnostics")
 def diagnostics(request: Request) -> StreamingResponse:
-    settings = request.app.state.provider_profile_service.diagnostic_summary()
+    providers = request.app.state.provider_profile_service
     content = create_diagnostics(
         request.app.state.paths,
         packaged=bool(getattr(request.app.state, "packaged", False)),
-        settings=settings,
+        provider_summary=providers.diagnostic_summary(),
+        known_secrets=providers.diagnostic_secret_values(),
     )
     return StreamingResponse(
         BytesIO(content),
