@@ -11,7 +11,7 @@ from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from app.shared.errors import AppError
 
-_EXCLUDED_DATA_DIRECTORIES = {"backups", "restore-staged", "codex-provider", "runtime"}
+_EXCLUDED_DATA_DIRECTORIES = {"backups", "restore-staged", "provider-runtime", "runtime"}
 
 
 class InvalidBackupError(AppError):

@@ -17,10 +17,10 @@ if ($LASTEXITCODE -ne 0) {
     throw '初始化 pip 失败。'
 }
 
-Write-Host '[2/4] 安装后端与 Codex SDK'
+Write-Host '[2/4] 安装后端依赖'
 Push-Location $Backend
 try {
-    & $Python -m pip install -e '.[dev,codex]' --index-url 'https://pypi.org/simple'
+    & $Python -m pip install -e '.[dev]' --index-url 'https://pypi.org/simple'
     if ($LASTEXITCODE -ne 0) {
         throw '安装后端依赖失败。'
     }

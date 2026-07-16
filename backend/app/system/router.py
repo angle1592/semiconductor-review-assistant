@@ -21,8 +21,6 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 
 def _setup_complete(request: Request) -> bool:
     settings = request.app.state.ai_settings_service.get()
-    if settings.provider == "codex":
-        return bool(settings.model.strip())
     return bool(settings.model.strip() and settings.base_url.strip() and settings.api_key_configured)
 
 

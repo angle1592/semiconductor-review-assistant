@@ -52,9 +52,9 @@ def test_ai_settings_persist_without_leaking_api_key(tmp_path: Path) -> None:
         tested = client.post(
             "/api/settings/ai/test",
             json={
-                "provider": "codex",
-                "base_url": "",
-                "model": "gpt-codex",
+                "provider": "openai_compatible",
+                "base_url": "https://models.example/v1",
+                "model": "review-model",
                 "vision_enabled": False,
             },
         )
@@ -68,7 +68,7 @@ def test_ai_settings_persist_without_leaking_api_key(tmp_path: Path) -> None:
     assert fetched.json()["base_url"] == "https://models.example/v1"
     assert tested.status_code == 200
     assert tested.json()["capabilities"] == ["text", "structured_output"]
-    assert selected == [("codex", None)]
+    assert selected == [("openai_compatible", "super-secret-api-key")]
     assert secrets.get("openai_compatible_api_key") == "super-secret-api-key"
 
     with sqlite3.connect(tmp_path / "review.db") as connection:

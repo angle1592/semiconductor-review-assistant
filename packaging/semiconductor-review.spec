@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_submodules
 
 
 root = Path(SPECPATH).parent
@@ -11,8 +11,6 @@ if not (frontend_dist / "index.html").is_file():
 hidden_imports = sorted(
     set(
         collect_submodules("keyring.backends")
-        + collect_submodules("codex_cli_bin")
-        + collect_submodules("openai_codex")
         + [
             "pythoncom",
             "pywintypes",
@@ -25,13 +23,11 @@ hidden_imports = sorted(
         ]
     )
 )
-codex_runtime_data = collect_data_files("codex_cli_bin", include_py_files=True)
-
 a = Analysis(
     [str(root / "packaging" / "desktop_entry.py")],
     pathex=[str(root / "backend")],
     binaries=[],
-    datas=[(str(frontend_dist), "frontend/dist"), *codex_runtime_data],
+    datas=[(str(frontend_dist), "frontend/dist")],
     hiddenimports=hidden_imports,
     hookspath=[],
     hooksconfig={},

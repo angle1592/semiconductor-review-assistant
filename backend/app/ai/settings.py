@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 from sqlmodel import Field as SQLField
 from sqlmodel import Session, SQLModel
 
-from app.ai.codex import CodexProvider
 from app.ai.openai_compatible import OpenAICompatibleProvider
 from app.ai.provider import AIProvider
 from app.ai.schemas import ConnectionTestResult
@@ -25,7 +24,7 @@ class AISettingsRecord(SQLModel, table=True):
 
 
 class AISettingsInput(BaseModel):
-    provider: Literal["openai_compatible", "codex"] = "openai_compatible"
+    provider: Literal["openai_compatible"] = "openai_compatible"
     base_url: str = "https://api.openai.com/v1"
     model: str = "gpt-4.1-mini"
     vision_enabled: bool = True
@@ -34,7 +33,7 @@ class AISettingsInput(BaseModel):
 
 
 class AISettingsResponse(BaseModel):
-    provider: Literal["openai_compatible", "codex"]
+    provider: Literal["openai_compatible"]
     base_url: str
     model: str
     api_key_configured: bool
@@ -47,12 +46,6 @@ ProviderFactory = Callable[[AISettingsInput, str | None, Path], AIProvider]
 def default_provider_factory(
     settings: AISettingsInput, api_key: str | None, data_dir: Path
 ) -> AIProvider:
-    if settings.provider == "codex":
-        return CodexProvider(
-            model=settings.model,
-            data_dir=data_dir,
-            vision_enabled=settings.vision_enabled,
-        )
     return OpenAICompatibleProvider(
         base_url=settings.base_url,
         api_key=api_key,
@@ -111,8 +104,6 @@ class AISettingsService:
 
     async def test(self, settings: AISettingsInput) -> ConnectionTestResult:
         api_key = settings.api_key or self.secret_store.get(API_KEY_SECRET)
-        if settings.provider == "codex":
-            api_key = None
         provider = self.provider_factory(settings, api_key, self.data_dir)
         return await provider.test_connection()
 
@@ -124,7 +115,5 @@ class AISettingsService:
             model=record.model,
             vision_enabled=record.vision_enabled,
         )
-        api_key = None
-        if settings.provider == "openai_compatible":
-            api_key = self.secret_store.get(API_KEY_SECRET)
+        api_key = self.secret_store.get(API_KEY_SECRET)
         return self.provider_factory(settings, api_key, self.data_dir)
