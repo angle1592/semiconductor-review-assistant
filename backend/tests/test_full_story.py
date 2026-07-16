@@ -35,7 +35,8 @@ def test_phase_one_review_project_story(tmp_path: Path):
     assert ready.json()['checks']['database'] == 'ok'
     assert created.status_code == 201
     assert [project['id'] for project in listed.json()] == [project_id]
-    assert deleted.status_code == 204
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"]["sources"] == 0
     assert after_delete.json() == []
 
 

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlmodel import Session
 
 from app.projects.models import ReviewProjectCreate, ReviewProjectRead, ReviewProjectUpdate
@@ -9,9 +9,11 @@ from app.projects.service import (
     delete_project,
     get_project,
     list_projects,
+    project_deletion_impact,
     update_project,
 )
 from app.shared.database import session_for
+from app.sources.schemas import DeletionImpact, DeletionResult
 
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -51,7 +53,25 @@ def update_project_endpoint(
     return update_project(session, project_id, payload)
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project_endpoint(project_id: str, session: SessionDependency) -> Response:
-    delete_project(session, project_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+@router.get("/{project_id}/deletion-impact", response_model=DeletionImpact)
+def project_deletion_impact_endpoint(
+    request: Request,
+    project_id: str,
+    session: SessionDependency,
+):
+    return project_deletion_impact(session, project_id, request.app.state.paths.data)
+
+
+@router.delete("/{project_id}", response_model=DeletionResult)
+def delete_project_endpoint(
+    request: Request,
+    project_id: str,
+    session: SessionDependency,
+):
+    impact = delete_project(
+        session,
+        project_id,
+        data_dir=request.app.state.paths.data,
+        runtime_dir=request.app.state.paths.runtime,
+    )
+    return {"deleted": impact}

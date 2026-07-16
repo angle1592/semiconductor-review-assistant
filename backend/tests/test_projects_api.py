@@ -34,7 +34,9 @@ def test_review_project_lifecycle(tmp_path):
         assert updated.json()["name"] == "资格考试总复习"
         assert updated.json()["importance_prompt"] == "优先法规和易混点"
 
-        assert client.delete(f"/api/projects/{project['id']}").status_code == 204
+        deleted = client.delete(f"/api/projects/{project['id']}")
+        assert deleted.status_code == 200
+        assert deleted.json()["deleted"]["sources"] == 0
         assert client.get(f"/api/projects/{project['id']}").status_code == 404
 
 

@@ -12,7 +12,9 @@ def parse_pdf(source: Path, output_dir: Path) -> ParsedSource:
     blocks: list[ParsedBlock] = []
     render_paths: list[str] = []
 
-    with fitz.open(source) as document:
+    # Opening from bytes avoids a lingering Windows file handle when MuPDF rejects
+    # a corrupt upload, so the temporary ingestion directory can be removed safely.
+    with fitz.open(stream=source.read_bytes(), filetype="pdf") as document:
         if document.needs_pass:
             raise ValueError("PDF is encrypted")
         for page_index, page in enumerate(document, start=1):

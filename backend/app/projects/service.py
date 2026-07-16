@@ -43,7 +43,18 @@ def update_project(
     return project
 
 
-def delete_project(session: Session, project_id: str) -> None:
-    project = get_project(session, project_id)
-    session.delete(project)
-    session.commit()
+def project_deletion_impact(session: Session, project_id: str, data_dir):
+    from app.sources.service import project_deletion_impact as source_project_deletion_impact
+
+    return source_project_deletion_impact(session, project_id, data_dir)
+
+
+def delete_project(session: Session, project_id: str, *, data_dir, runtime_dir):
+    from app.sources.service import delete_project_cascade
+
+    return delete_project_cascade(
+        session,
+        project_id,
+        data_dir=data_dir,
+        runtime_dir=runtime_dir,
+    )

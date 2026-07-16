@@ -5,11 +5,21 @@ from fastapi.responses import JSONResponse
 
 
 class AppError(Exception):
-    def __init__(self, *, code: str, message: str, status_code: int):
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        status_code: int,
+        action: str | None = None,
+        context: dict[str, object] | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = status_code
+        self.action = action
+        self.context = context or {}
 
 
 class NotFoundError(AppError):
@@ -22,14 +32,19 @@ class NotFoundError(AppError):
 
 
 async def app_error_handler(request: Request, error: AppError) -> JSONResponse:
+    content: dict[str, object] = {
+        "title": error.code,
+        "code": error.code,
+        "message": error.message,
+        "request_id": request.state.request_id,
+    }
+    if error.action is not None:
+        content["action"] = error.action
+    if error.context:
+        content["context"] = error.context
     return JSONResponse(
         status_code=error.status_code,
-        content={
-            "title": error.code,
-            "code": error.code,
-            "message": error.message,
-            "request_id": request.state.request_id,
-        },
+        content=content,
     )
 
 
@@ -48,4 +63,6 @@ async def unexpected_error_handler(request: Request, error: Exception) -> JSONRe
             "request_id": request.state.request_id,
         },
     )
+
+
 logger = logging.getLogger(__name__)

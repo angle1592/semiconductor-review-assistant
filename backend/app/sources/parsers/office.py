@@ -16,8 +16,8 @@ class OfficeConversionUnavailable(AppError):
                 "请另存为 .docx/.pptx 后重试。"
             ),
             status_code=422,
+            action="convert_to_modern_format",
         )
-        self.action = "convert_to_modern_format"
 
 
 def _registered(prog_id: str) -> bool:

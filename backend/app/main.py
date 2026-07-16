@@ -17,6 +17,9 @@ from app.projects.router import router as projects_router
 from app.shared.database import create_database
 from app.shared.errors import AppError, app_error_handler, unexpected_error_handler
 from app.shared.request_id import RequestIdMiddleware
+from app.sources.parse_cache import ParseCache
+from app.sources.router import router as sources_router
+from app.sources.service import DEFAULT_SOURCE_MAX_BYTES, SourceParsingService
 from app.runtime.migrations import migrate_database
 from app.runtime.identity import APPLICATION_ID, DATABASE_NAME, PROTOCOL_VERSION
 from app.runtime.paths import AppPaths
@@ -32,6 +35,7 @@ def create_app(
     secret_store: SecretStore | None = None,
     provider_adapter_factory: AdapterFactory = default_adapter_factory,
     frontend_dist_dir: str | Path | None = None,
+    source_max_bytes: int = DEFAULT_SOURCE_MAX_BYTES,
 ) -> FastAPI:
     resolved_data_dir = Path(data_dir).resolve()
 
@@ -50,10 +54,16 @@ def create_app(
         backups=resolved_data_dir.parent / "Backups",
         logs=resolved_data_dir.parent / "Logs",
         runtime=resolved_data_dir.parent / "Runtime",
-        frontend_dist=Path(frontend_dist_dir).resolve() if frontend_dist_dir else resolved_data_dir.parent / "frontend" / "dist",
+        frontend_dist=Path(frontend_dist_dir).resolve()
+        if frontend_dist_dir
+        else resolved_data_dir.parent / "frontend" / "dist",
     )
     app.state.packaged = False
     app.state.database = create_database(resolved_data_dir)
+    app.state.source_max_bytes = source_max_bytes
+    app.state.source_parsing_service = SourceParsingService(
+        ParseCache(app.state.paths.runtime / "parse-cache")
+    )
     app.state.provider_profile_service = ProviderProfileService(
         app.state.database, secret_store or WindowsKeyringSecretStore(), provider_adapter_factory
     )
@@ -88,9 +98,11 @@ def create_app(
             (time.perf_counter() - started) * 1000,
         )
         return response
+
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)
     app.include_router(projects_router)
+    app.include_router(sources_router)
     app.include_router(providers_router)
     app.include_router(backup_router)
     app.include_router(system_router)
