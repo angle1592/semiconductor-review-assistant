@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from app.providers.credentials import MemorySecretStore, credential_key
-from app.providers.schemas import ProviderProfileCreate
+from app.providers.schemas import ProviderProfileCreate, ProviderProfileUpdate
 from app.providers.service import ProviderProfileService
 from app.shared.database import create_database
 
@@ -35,3 +35,21 @@ def test_replacing_and_deleting_key_updates_credential_namespace(tmp_path: Path)
 
     service.delete(profile.id)
     assert secrets.get(credential_key(profile.id)) is None
+
+
+def test_endpoint_edit_increments_generation_for_future_cache_keys(tmp_path: Path):
+    service = ProviderProfileService(create_database(tmp_path), MemorySecretStore())
+    profile = service.create(
+        ProviderProfileCreate(
+            name="服务",
+            protocol="openai_compatible",
+            base_url="https://first.test/v1",
+        )
+    )
+
+    updated = service.update(
+        profile.id,
+        ProviderProfileUpdate(base_url="https://second.test/v1"),
+    )
+
+    assert updated.credential_generation == profile.credential_generation + 1

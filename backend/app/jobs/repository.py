@@ -124,6 +124,29 @@ def complete_job(
     return result.rowcount == 1
 
 
+def cancel_job(
+    engine,
+    job_id: int,
+    *,
+    worker_id: str,
+    now: datetime,
+) -> bool:
+    timestamp = _database_time(now)
+    with engine.begin() as connection:
+        result = connection.exec_driver_sql(
+            """
+            UPDATE durable_job
+            SET status = 'cancelled',
+                worker_id = NULL,
+                lease_expires_at = NULL,
+                updated_at = ?
+            WHERE id = ? AND status = 'running' AND worker_id = ?
+            """,
+            (timestamp, job_id, worker_id),
+        )
+    return result.rowcount == 1
+
+
 def retry_or_fail_job(
     engine,
     job_id: int,

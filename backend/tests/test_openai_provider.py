@@ -37,5 +37,6 @@ async def test_openai_generates_structured_result_and_usage():
     assert result.value.ok is True
     assert result.input_tokens == 12
     assert result.cached_input_tokens == 4
+    assert result.cache_usage_reported is True
     assert result.request_id == "req-1"
     await client.aclose()

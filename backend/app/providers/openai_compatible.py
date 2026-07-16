@@ -35,17 +35,18 @@ class OpenAICompatibleAdapter:
         except (KeyError, TypeError, ValueError) as error:
             raise invalid_response_error() from error
 
-    def _content(self, prompt: str, images: list[str]) -> str | list[dict]:
+    def _content(self, prompt: str, images: list[str], prompt_prefix: str = "") -> str | list[dict]:
+        combined = f"{prompt_prefix}{prompt}"
         if not images:
-            return prompt
-        return [{"type": "text", "text": prompt}, *({"type": "image_url", "image_url": {"url": image}} for image in images)]
+            return combined
+        return [{"type": "text", "text": combined}, *({"type": "image_url", "image_url": {"url": image}} for image in images)]
 
-    async def _complete(self, model: str, prompt: str, system: str, images: list[str], schema: dict | None = None) -> tuple[str, httpx.Response, dict]:
+    async def _complete(self, model: str, prompt: str, system: str, images: list[str], schema: dict | None = None, *, prompt_prefix: str = "", temperature: float = 0) -> tuple[str, httpx.Response, dict]:
         messages: list[dict] = []
         if system:
             messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": self._content(prompt, images)})
-        payload: dict[str, Any] = {"model": model, "messages": messages}
+        messages.append({"role": "user", "content": self._content(prompt, images, prompt_prefix)})
+        payload: dict[str, Any] = {"model": model, "messages": messages, "temperature": temperature}
         if schema is not None:
             payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "shiyao_result", "strict": True, "schema": schema}}
         response = await self._send(self.endpoints.inference_url, payload=payload)
@@ -56,20 +57,22 @@ class OpenAICompatibleAdapter:
             raise invalid_response_error() from error
 
     def _result(self, value, model: str, response: httpx.Response, usage: dict) -> ProviderResult:
-        return ProviderResult(value=value, model_id=model, input_tokens=int(usage.get("prompt_tokens", 0)), output_tokens=int(usage.get("completion_tokens", 0)), cached_input_tokens=int(usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)), request_id=response.headers.get("x-request-id"))
+        details = usage.get("prompt_tokens_details")
+        reported = isinstance(details, dict) and "cached_tokens" in details
+        return ProviderResult(value=value, model_id=model, input_tokens=int(usage.get("prompt_tokens", 0)), output_tokens=int(usage.get("completion_tokens", 0)), cached_input_tokens=int((details or {}).get("cached_tokens", 0)), cache_usage_reported=reported, request_id=response.headers.get("x-request-id"))
 
     async def generate_text(self, request: TextRequest) -> ProviderResult[str]:
-        text, response, usage = await self._complete(request.model, request.prompt, request.system, request.images)
+        text, response, usage = await self._complete(request.model, request.prompt, request.system, request.images, prompt_prefix=request.prompt_prefix, temperature=request.temperature)
         return self._result(text, request.model, response, usage)
 
     async def generate_json(self, request: StructuredRequest[Any]) -> ProviderResult[Any]:
         schema = request.output_type.model_json_schema()
-        raw, response, usage = await self._complete(request.model, request.prompt, request.system, request.images, schema)
+        raw, response, usage = await self._complete(request.model, request.prompt, request.system, request.images, schema, prompt_prefix=request.prompt_prefix, temperature=request.temperature)
         try:
             value = request.output_type.model_validate_json(raw)
         except (ValidationError, ValueError, json.JSONDecodeError):
             repair = f"修复为严格符合此 JSON Schema 的 JSON，只返回 JSON。\nSchema: {json.dumps(schema, ensure_ascii=False)}\n原输出: {raw}"
-            raw, response, usage = await self._complete(request.model, repair, request.system, [], schema)
+            raw, response, usage = await self._complete(request.model, repair, request.system, [], schema, temperature=request.temperature)
             try:
                 value = request.output_type.model_validate_json(raw)
             except (ValidationError, ValueError, json.JSONDecodeError) as error:

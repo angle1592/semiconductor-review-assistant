@@ -19,10 +19,14 @@ def create_analysis_run(
     prompt_snapshot: str,
     provider_id: str,
     provider_config_generation: int,
+    provider_protocol: str = "",
+    provider_base_url: str = "",
     model_id: str,
     schema_version: str,
     pipeline_version: str,
     batches: list[list[str]],
+    parameters: dict[str, object] | None = None,
+    commit: bool = True,
 ) -> AnalysisRun:
     run = AnalysisRun(
         project_id=project_id,
@@ -30,9 +34,14 @@ def create_analysis_run(
         prompt_snapshot=prompt_snapshot,
         provider_id=provider_id,
         provider_config_generation=provider_config_generation,
+        provider_protocol=provider_protocol,
+        provider_base_url=provider_base_url,
         model_id=model_id,
         schema_version=schema_version,
         pipeline_version=pipeline_version,
+        parameters_json=json.dumps(
+            parameters or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ),
         total_batches=len(batches),
     )
     session.add(run)
@@ -45,8 +54,11 @@ def create_analysis_run(
                 block_ids_json=json.dumps(block_ids, separators=(",", ":")),
             )
         )
-    session.commit()
-    session.refresh(run)
+    if commit:
+        session.commit()
+        session.refresh(run)
+    else:
+        session.flush()
     return run
 
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from app.runtime.identity import APPLICATION_ID
 
 
-CURRENT_DATABASE_VERSION = 4
+CURRENT_DATABASE_VERSION = 5
 MIGRATION_BACKUP_LIMIT = 5
 
 
@@ -193,11 +193,34 @@ def _migrate_to_v4(connection: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_to_v5(connection: sqlite3.Connection) -> None:
+    additions = {
+        "analysis_run": {
+            "provider_protocol": "TEXT NOT NULL DEFAULT ''",
+            "provider_base_url": "TEXT NOT NULL DEFAULT ''",
+            "parameters_json": "TEXT NOT NULL DEFAULT '{}'",
+        },
+        "analysis_batch": {
+            "cache_status": "TEXT",
+            "provider_cached_input_tokens": "INTEGER NOT NULL DEFAULT 0",
+            "provider_cache_usage_reported": "INTEGER NOT NULL DEFAULT 0",
+        },
+    }
+    for table, columns in additions.items():
+        existing = {
+            str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        for column, definition in columns.items():
+            if column not in existing:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 MIGRATIONS = {
     1: _migrate_to_v1,
     2: _migrate_to_v2,
     3: _migrate_to_v3,
     4: _migrate_to_v4,
+    5: _migrate_to_v5,
 }
 
 

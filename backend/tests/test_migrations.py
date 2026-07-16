@@ -68,8 +68,8 @@ def test_phase_one_database_upgrades_through_provider_source_and_job_schemas(tmp
 
     migrate_database(database_path, tmp_path / "Backups")
 
-    assert CURRENT_DATABASE_VERSION == 4
-    assert _user_version(database_path) == 4
+    assert CURRENT_DATABASE_VERSION == 5
+    assert _user_version(database_path) == 5
     with sqlite3.connect(database_path) as connection:
         tables = {
             row[0]

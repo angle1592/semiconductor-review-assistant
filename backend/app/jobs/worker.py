@@ -6,9 +6,10 @@ from pathlib import Path
 import time
 from uuid import uuid4
 
-from app.jobs.repository import claim_next_job, complete_job, retry_or_fail_job
+from app.jobs.repository import cancel_job, claim_next_job, complete_job, retry_or_fail_job
 from app.jobs.service import redact_error_detail
 from app.runtime.paths import AppPaths
+from app.shared.errors import AppError
 from app.shared.database import create_database
 
 
@@ -43,27 +44,48 @@ class DurableWorker:
             return False
         try:
             handler = self.handlers[job.kind]
-            handler(json.loads(job.payload_json))
+            payload = json.loads(job.payload_json)
+            result = handler(payload)
         except Exception as error:
-            retry_or_fail_job(
+            error_code = error.code if isinstance(error, AppError) else "JOB_HANDLER_FAILED"
+            detail = redact_error_detail(error)
+            state = retry_or_fail_job(
                 self.engine,
                 job.id,
                 worker_id=self.worker_id,
-                public_error_code="JOB_HANDLER_FAILED",
-                error_detail=redact_error_detail(error),
+                public_error_code=error_code,
+                error_detail=detail,
                 now=timestamp,
                 base_delay_seconds=self.retry_base_seconds,
             )
+            if state == "failed":
+                terminal_handler = getattr(handler, "on_terminal_failure", None)
+                if terminal_handler is not None:
+                    terminal_handler(payload, error_code, detail)
             return True
-        complete_job(self.engine, job.id, worker_id=self.worker_id, now=timestamp)
+        if result == "cancelled":
+            cancel_job(self.engine, job.id, worker_id=self.worker_id, now=timestamp)
+        else:
+            complete_job(self.engine, job.id, worker_id=self.worker_id, now=timestamp)
         return True
 
 
 def main() -> None:
+    from app.analysis.worker_handler import AnalysisWorkerHandler
+    from app.providers.credentials import WindowsKeyringSecretStore
+    from app.providers.service import default_adapter_factory
+
     paths = AppPaths.discover()
     paths.ensure_directories()
     engine = create_database(paths.data)
-    worker = DurableWorker(engine, {})
+    analysis_handler = AnalysisWorkerHandler(
+        engine,
+        paths.runtime,
+        WindowsKeyringSecretStore(),
+        default_adapter_factory,
+        data_dir=paths.data,
+    )
+    worker = DurableWorker(engine, {"analysis_run": analysis_handler})
     stop_file_value = os.getenv("SHIYAO_WORKER_STOP_FILE", "")
     stop_file = Path(stop_file_value).resolve() if stop_file_value else None
     poll_seconds = float(os.getenv("SHIYAO_WORKER_POLL_SECONDS", "0.5"))

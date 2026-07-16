@@ -24,9 +24,12 @@ class AnalysisRun(SQLModel, table=True):
     prompt_snapshot: str
     provider_id: str
     provider_config_generation: int
+    provider_protocol: str = ""
+    provider_base_url: str = ""
     model_id: str
     schema_version: str
     pipeline_version: str
+    parameters_json: str = "{}"
     total_batches: int = 0
     completed_batches: int = 0
     failed_batches: int = 0
@@ -50,5 +53,8 @@ class AnalysisBatch(SQLModel, table=True):
     result_json: str | None = None
     public_error_code: str | None = None
     error_detail: str | None = None
+    cache_status: str | None = None
+    provider_cached_input_tokens: int = 0
+    provider_cache_usage_reported: bool = False
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

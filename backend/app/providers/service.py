@@ -95,9 +95,9 @@ class ProviderProfileService:
                 profile.base_url = resolve_endpoints(profile.protocol, payload.base_url or profile.base_url).base_url
             if payload.api_key:
                 self.secrets.set(credential_key(profile.id), payload.api_key)
-                profile.credential_generation += 1
                 changed_endpoint = True
             if changed_endpoint:
+                profile.credential_generation += 1
                 profile.enabled = False
                 profile.models_fetched_at = None
                 for model in session.exec(select(ModelProfile).where(ModelProfile.provider_id == profile.id)):

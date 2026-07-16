@@ -32,4 +32,5 @@ async def test_anthropic_reports_cache_usage():
     assert result.value == "ready"
     assert result.cached_input_tokens == 3
     assert result.cache_creation_input_tokens == 2
+    assert result.cache_usage_reported is True
     await client.aclose()

@@ -19,6 +19,10 @@ class TextRequest:
     prompt: str
     system: str = ""
     images: list[str] = field(default_factory=list)
+    prompt_prefix: str = ""
+    cache_system: bool = False
+    cache_prompt_prefix: bool = False
+    temperature: float = 0
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,10 @@ class StructuredRequest(Generic[T]):
     output_type: type[BaseModel]
     system: str = ""
     images: list[str] = field(default_factory=list)
+    prompt_prefix: str = ""
+    cache_system: bool = False
+    cache_prompt_prefix: bool = False
+    temperature: float = 0
 
 
 @dataclass(frozen=True)
@@ -38,6 +46,7 @@ class ProviderResult(Generic[T]):
     output_tokens: int = 0
     cached_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
+    cache_usage_reported: bool = False
     request_id: str | None = None
 
 

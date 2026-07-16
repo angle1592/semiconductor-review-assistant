@@ -35,8 +35,14 @@ class AnthropicAdapter:
         except (KeyError, TypeError, ValueError) as error:
             raise invalid_response_error() from error
 
-    def _content(self, prompt: str, images: list[str]) -> list[dict]:
-        content: list[dict] = [{"type": "text", "text": prompt}]
+    def _content(self, prompt: str, images: list[str], prompt_prefix: str = "", cache_prompt_prefix: bool = False) -> list[dict]:
+        content: list[dict] = []
+        if prompt_prefix:
+            prefix: dict[str, Any] = {"type": "text", "text": prompt_prefix}
+            if cache_prompt_prefix:
+                prefix["cache_control"] = {"type": "ephemeral"}
+            content.append(prefix)
+        content.append({"type": "text", "text": prompt})
         for image in images:
             try:
                 header, data = image.split(",", 1)
@@ -46,10 +52,10 @@ class AnthropicAdapter:
             content.append({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}})
         return content
 
-    async def _complete(self, model: str, prompt: str, system: str, images: list[str]) -> tuple[str, httpx.Response, dict]:
-        payload: dict[str, Any] = {"model": model, "max_tokens": 2048, "messages": [{"role": "user", "content": self._content(prompt, images)}]}
+    async def _complete(self, model: str, prompt: str, system: str, images: list[str], *, prompt_prefix: str = "", cache_system: bool = False, cache_prompt_prefix: bool = False, temperature: float = 0) -> tuple[str, httpx.Response, dict]:
+        payload: dict[str, Any] = {"model": model, "max_tokens": 2048, "temperature": temperature, "messages": [{"role": "user", "content": self._content(prompt, images, prompt_prefix, cache_prompt_prefix)}]}
         if system:
-            payload["system"] = system
+            payload["system"] = ([{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}] if cache_system else system)
         response = await self._send(self.endpoints.inference_url, payload=payload)
         try:
             body = response.json()
@@ -59,10 +65,11 @@ class AnthropicAdapter:
             raise invalid_response_error() from error
 
     def _result(self, value, model: str, response: httpx.Response, usage: dict) -> ProviderResult:
-        return ProviderResult(value=value, model_id=model, input_tokens=int(usage.get("input_tokens", 0)), output_tokens=int(usage.get("output_tokens", 0)), cached_input_tokens=int(usage.get("cache_read_input_tokens", 0)), cache_creation_input_tokens=int(usage.get("cache_creation_input_tokens", 0)), request_id=response.headers.get("request-id"))
+        reported = "cache_read_input_tokens" in usage or "cache_creation_input_tokens" in usage
+        return ProviderResult(value=value, model_id=model, input_tokens=int(usage.get("input_tokens", 0)), output_tokens=int(usage.get("output_tokens", 0)), cached_input_tokens=int(usage.get("cache_read_input_tokens", 0)), cache_creation_input_tokens=int(usage.get("cache_creation_input_tokens", 0)), cache_usage_reported=reported, request_id=response.headers.get("request-id"))
 
     async def generate_text(self, request: TextRequest) -> ProviderResult[str]:
-        text, response, usage = await self._complete(request.model, request.prompt, request.system, request.images)
+        text, response, usage = await self._complete(request.model, request.prompt, request.system, request.images, prompt_prefix=request.prompt_prefix, cache_system=request.cache_system, cache_prompt_prefix=request.cache_prompt_prefix, temperature=request.temperature)
         return self._result(text, request.model, response, usage)
 
     async def probe_prompt_cache(self, model: str) -> ProviderResult[str]:
@@ -82,13 +89,13 @@ class AnthropicAdapter:
 
     async def generate_json(self, request: StructuredRequest[Any]) -> ProviderResult[Any]:
         schema = request.output_type.model_json_schema()
-        prompt = f"{request.prompt}\n只返回符合此 JSON Schema 的 JSON：{json.dumps(schema, ensure_ascii=False)}"
-        raw, response, usage = await self._complete(request.model, prompt, request.system, request.images)
+        prefix = f"{request.prompt_prefix}\n只返回符合此 JSON Schema 的 JSON：{json.dumps(schema, ensure_ascii=False)}"
+        raw, response, usage = await self._complete(request.model, request.prompt, request.system, request.images, prompt_prefix=prefix, cache_system=request.cache_system, cache_prompt_prefix=request.cache_prompt_prefix, temperature=request.temperature)
         try:
             value = request.output_type.model_validate_json(raw)
         except (ValidationError, ValueError, json.JSONDecodeError):
             repair = f"修复为严格符合此 JSON Schema 的 JSON，只返回 JSON。\nSchema: {json.dumps(schema, ensure_ascii=False)}\n原输出: {raw}"
-            raw, response, usage = await self._complete(request.model, repair, request.system, [])
+            raw, response, usage = await self._complete(request.model, repair, request.system, [], temperature=request.temperature)
             try:
                 value = request.output_type.model_validate_json(raw)
             except (ValidationError, ValueError, json.JSONDecodeError) as error:
