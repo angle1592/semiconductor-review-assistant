@@ -52,3 +52,47 @@ def test_current_shiyao_database_is_idempotent(tmp_path: Path):
     assert backup is None
     with sqlite3.connect(database_path) as connection:
         assert connection.execute("SELECT id FROM kept").fetchone() == ("yes",)
+
+
+def test_phase_one_database_upgrades_through_provider_and_source_schemas(tmp_path: Path):
+    database_path = tmp_path / "Data" / "shiyao.db"
+    database_path.parent.mkdir()
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            "CREATE TABLE app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO app_metadata (key, value) VALUES ('product', 'shiyao-review')"
+        )
+        connection.execute("PRAGMA user_version=1")
+
+    migrate_database(database_path, tmp_path / "Backups")
+
+    assert CURRENT_DATABASE_VERSION == 3
+    assert _user_version(database_path) == 3
+    with sqlite3.connect(database_path) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        indexes = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            ).fetchall()
+        }
+
+    assert {
+        "ai_provider_profile",
+        "model_profile",
+        "source_document",
+        "source_block",
+    } <= tables
+    assert {
+        "ix_source_document_project_id",
+        "ix_source_document_sha256",
+        "ix_source_block_document_id",
+        "ix_source_block_ordinal",
+    } <= indexes

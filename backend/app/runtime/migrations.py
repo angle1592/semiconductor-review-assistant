@@ -8,7 +8,7 @@ from pathlib import Path
 from app.runtime.identity import APPLICATION_ID
 
 
-CURRENT_DATABASE_VERSION = 1
+CURRENT_DATABASE_VERSION = 3
 MIGRATION_BACKUP_LIMIT = 5
 
 
@@ -41,6 +41,103 @@ def _trim_backups(backup_dir: Path) -> None:
         stale.unlink(missing_ok=True)
 
 
+def _migrate_to_v1(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    )
+    connection.execute(
+        "INSERT OR REPLACE INTO app_metadata (key, value) VALUES ('product', ?)",
+        (APPLICATION_ID,),
+    )
+
+
+def _migrate_to_v2(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS ai_provider_profile (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            protocol TEXT NOT NULL,
+            base_url TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 0,
+            is_default INTEGER NOT NULL DEFAULT 0,
+            credential_generation INTEGER NOT NULL DEFAULT 1,
+            models_fetched_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_ai_provider_profile_protocol
+            ON ai_provider_profile(protocol);
+        CREATE TABLE IF NOT EXISTS model_profile (
+            id TEXT PRIMARY KEY,
+            provider_id TEXT NOT NULL REFERENCES ai_provider_profile(id),
+            model_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            text_status TEXT NOT NULL DEFAULT 'untested',
+            structured_status TEXT NOT NULL DEFAULT 'untested',
+            vision_status TEXT NOT NULL DEFAULT 'untested',
+            prompt_cache_status TEXT NOT NULL DEFAULT 'untested',
+            safe_error_code TEXT,
+            validated_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS ix_model_profile_provider_id
+            ON model_profile(provider_id);
+        """
+    )
+
+
+def _migrate_to_v3(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS source_document (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL REFERENCES review_project(id),
+            original_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL,
+            extension TEXT NOT NULL,
+            media_type TEXT NOT NULL,
+            byte_size INTEGER NOT NULL,
+            sha256 TEXT NOT NULL,
+            source_kind TEXT NOT NULL DEFAULT 'mixed',
+            parse_status TEXT NOT NULL DEFAULT 'queued',
+            parser_version TEXT NOT NULL,
+            page_count INTEGER,
+            parse_message TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_source_document_project_id
+            ON source_document(project_id);
+        CREATE INDEX IF NOT EXISTS ix_source_document_sha256
+            ON source_document(sha256);
+        CREATE TABLE IF NOT EXISTS source_block (
+            id TEXT PRIMARY KEY,
+            document_id INTEGER NOT NULL REFERENCES source_document(id),
+            ordinal INTEGER NOT NULL,
+            locator TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            text TEXT NOT NULL DEFAULT '',
+            page_number INTEGER,
+            heading_path_json TEXT NOT NULL DEFAULT '[]',
+            asset_path TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_source_block_document_id
+            ON source_block(document_id);
+        CREATE INDEX IF NOT EXISTS ix_source_block_ordinal
+            ON source_block(ordinal);
+        """
+    )
+
+
+MIGRATIONS = {
+    1: _migrate_to_v1,
+    2: _migrate_to_v2,
+    3: _migrate_to_v3,
+}
+
+
 def migrate_database(database_path: Path, backup_dir: Path) -> Path | None:
     database_path.parent.mkdir(parents=True, exist_ok=True)
     backup_dir.mkdir(parents=True, exist_ok=True)
@@ -68,14 +165,9 @@ def migrate_database(database_path: Path, backup_dir: Path) -> Path | None:
         shutil.copy2(database_path, backup_path)
 
     with sqlite3.connect(database_path) as connection:
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
-        )
-        connection.execute(
-            "INSERT OR REPLACE INTO app_metadata (key, value) VALUES ('product', ?)",
-            (APPLICATION_ID,),
-        )
-        connection.execute(f"PRAGMA user_version={CURRENT_DATABASE_VERSION}")
+        for version in range(current_version + 1, CURRENT_DATABASE_VERSION + 1):
+            MIGRATIONS[version](connection)
+            connection.execute(f"PRAGMA user_version={version}")
         connection.commit()
     _trim_backups(backup_dir)
     return backup_path
