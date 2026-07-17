@@ -61,7 +61,7 @@ def _sanitize_database_snapshot(path: Path) -> None:
         connection.commit()
 
 
-def create_backup(data_dir: Path, app_version: str = "0.2.0") -> bytes:
+def create_backup(data_dir: Path, app_version: str = "0.2.1") -> bytes:
     files = _data_files(data_dir)
     contents: dict[str, bytes] = {}
     database_path = data_dir / DATABASE_NAME

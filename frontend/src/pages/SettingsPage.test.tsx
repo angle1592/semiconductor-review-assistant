@@ -15,7 +15,7 @@ it('lists multiple third-party services and their validation state', async () =>
     const url = String(input)
     if (url.endsWith('/api/providers')) return { ok: true, status: 200, json: async () => [provider] }
     if (url.endsWith('/api/providers/p1/models')) return { ok: true, status: 200, json: async () => [model] }
-    if (url.endsWith('/api/system/info')) return { ok: true, status: 200, json: async () => ({ application: 'shiyao-review', version: '0.2.0-beta', packaged: false, setup_complete: true, data_directory: 'data', log_directory: 'logs' }) }
+    if (url.endsWith('/api/system/info')) return { ok: true, status: 200, json: async () => ({ application: 'shiyao-review', version: '0.2.1-beta', packaged: false, setup_complete: true, data_directory: 'data', log_directory: 'logs' }) }
     if (url.endsWith('/api/system/caches')) return { ok: true, status: 200, json: async () => ({ parse: { files: 2, bytes: 2048 }, ai: { files: 1, bytes: 512 } }) }
     throw new Error(`Unexpected request: ${url}`)
   }))
@@ -36,7 +36,7 @@ it('shows cache impact and sends exact byte confirmation before clearing', async
     const url = String(input)
     calls.push({ url, init })
     if (url.endsWith('/api/providers')) return { ok: true, status: 200, json: async () => [] }
-    if (url.endsWith('/api/system/info')) return { ok: true, status: 200, json: async () => ({ application: 'shiyao-review', version: '0.2.0-beta', packaged: false, setup_complete: true, data_directory: 'data', log_directory: 'logs' }) }
+    if (url.endsWith('/api/system/info')) return { ok: true, status: 200, json: async () => ({ application: 'shiyao-review', version: '0.2.1-beta', packaged: false, setup_complete: true, data_directory: 'data', log_directory: 'logs' }) }
     if (url.endsWith('/api/system/caches') && !init?.method) return { ok: true, status: 200, json: async () => ({ parse: { files: 2, bytes: 2048 }, ai: { files: 1, bytes: 512 } }) }
     if (url.endsWith('/api/system/caches/parse/clear')) return { ok: true, status: 200, json: async () => ({ cleared: true, removed: { files: 2, bytes: 2048 }, current: { parse: { files: 0, bytes: 0 }, ai: { files: 1, bytes: 512 } } }) }
     throw new Error(`Unexpected request: ${url}`)
