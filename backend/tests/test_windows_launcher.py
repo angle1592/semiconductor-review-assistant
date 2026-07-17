@@ -1,5 +1,7 @@
+import ctypes
 import json
 import os
+import signal
 import shutil
 import socket
 import subprocess
@@ -110,20 +112,38 @@ def _listener_pid(port: int) -> int:
 
 
 def _parent_pid(process_id: int) -> int:
-    assert POWERSHELL is not None
-    result = subprocess.run(
-        [
-            POWERSHELL,
-            "-NoProfile",
-            "-Command",
-            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={process_id}').ParentProcessId",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=True,
-    )
-    return int(result.stdout.strip())
+    class ProcessBasicInformation(ctypes.Structure):
+        _fields_ = [
+            ("reserved1", ctypes.c_void_p),
+            ("peb_base_address", ctypes.c_void_p),
+            ("reserved2", ctypes.c_void_p * 2),
+            ("unique_process_id", ctypes.c_void_p),
+            ("inherited_from_unique_process_id", ctypes.c_void_p),
+        ]
+
+    process = ctypes.windll.kernel32.OpenProcess(0x1000, False, process_id)
+    if not process:
+        raise OSError(ctypes.get_last_error(), f"Cannot open process {process_id}")
+    try:
+        information = ProcessBasicInformation()
+        status = ctypes.windll.ntdll.NtQueryInformationProcess(
+            process,
+            0,
+            ctypes.byref(information),
+            ctypes.sizeof(information),
+            None,
+        )
+        if status != 0:
+            raise OSError(f"NtQueryInformationProcess failed with status {status:#x}")
+        return int(information.inherited_from_unique_process_id)
+    finally:
+        ctypes.windll.kernel32.CloseHandle(process)
+
+
+def test_launchers_do_not_depend_on_unbounded_wmi_queries():
+    for script in ("start.ps1", "stop.ps1"):
+        content = (PROJECT_ROOT / script).read_text(encoding="utf-8-sig")
+        assert "Get-CimInstance" not in content
 
 
 def test_launcher_reuses_running_instance_and_stopper_releases_port(tmp_path: Path):
@@ -262,7 +282,7 @@ def test_launcher_refuses_a_generic_ready_response_without_app_marker(tmp_path: 
     assert not (runtime_dir / "server.pid").exists()
 
 
-def test_launcher_reuses_a_verified_legacy_runner_without_app_marker(tmp_path: Path):
+def test_launcher_refuses_a_legacy_runner_without_current_app_marker(tmp_path: Path):
     port = _free_port()
     runtime_dir = tmp_path / "runtime"
     env = os.environ.copy()
@@ -303,17 +323,19 @@ ThreadingHTTPServer(("127.0.0.1", int(sys.argv[-1])), Handler).serve_forever()
             env=env,
         )
 
-        assert result.returncode == 0
+        assert result.returncode != 0
         assert _is_ready(port)
         assert not (runtime_dir / "server.pid").exists()
     finally:
-        subprocess.run(
-            ["taskkill", "/PID", str(legacy.pid), "/T", "/F"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-            check=False,
-        )
+        try:
+            os.kill(_listener_pid(port), signal.SIGTERM)
+        except (OSError, AssertionError):
+            pass
+        try:
+            legacy.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            legacy.kill()
+            legacy.wait(timeout=5)
 
 
 def test_stopper_does_not_kill_a_runner_referenced_by_stale_metadata(tmp_path: Path):

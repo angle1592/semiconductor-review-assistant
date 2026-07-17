@@ -20,7 +20,7 @@ it('explains supported files and uploads from both picker and drop zone', async 
     if (url.endsWith('/api/projects/project-1/sources')) {
       return { ok: true, status: 200, json: async () => ({ items: uploaded ? [{ id: 1, project_id: 'project-1', display_name: '复习资料.pptx', extension: '.pptx', media_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', byte_size: 1200, sha256: 'sha', source_kind: 'mixed', parse_status: 'degraded', parser_version: '1', page_count: 2, warnings: ['PPTX 预览不可用'], created_at: '2026-07-16T12:00:00Z', updated_at: '2026-07-16T12:00:00Z' }] : [], total: uploaded ? 1 : 0, offset: 0, limit: 20 }) }
     }
-    if (url.endsWith('/api/sources/1/blocks')) {
+    if (url.includes('/api/sources/1/blocks?')) {
       return { ok: true, status: 200, json: async () => ({ items: [], total: 0, offset: 0, limit: 100 }) }
     }
     throw new Error(`Unexpected request: ${url}`)

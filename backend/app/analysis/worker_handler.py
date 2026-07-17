@@ -99,6 +99,12 @@ class AnalysisWorkerHandler:
             run.error_detail = error_detail
             session.add(run)
             session.commit()
+            if run.status == "partial":
+                from app.keypoints.service import materialize_run_candidates
+                from app.study.service import materialize_run_source_questions
+
+                materialize_run_candidates(session, run_id)
+                materialize_run_source_questions(session, run_id)
 
     def _batch_context(
         self,

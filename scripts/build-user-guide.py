@@ -83,7 +83,7 @@ def page_footer(canvas, doc):
     canvas.line(22 * mm, 16 * mm, 188 * mm, 16 * mm)
     canvas.setFont("STSong-Light", 8)
     canvas.setFillColor(MUTED)
-    canvas.drawString(22 * mm, 10 * mm, "拾要 · 0.2.1-beta")
+    canvas.drawString(22 * mm, 10 * mm, "拾要 · 0.2.2-beta")
     canvas.drawRightString(188 * mm, 10 * mm, f"{doc.page}")
     canvas.restoreState()
 

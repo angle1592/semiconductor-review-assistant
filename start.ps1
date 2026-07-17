@@ -73,22 +73,6 @@ function Get-ListenerProcessId {
     return $null
 }
 
-function Test-VerifiedRunnerListener {
-    $ListenerId = Get-ListenerProcessId
-    if ($null -eq $ListenerId) {
-        return $false
-    }
-    $ProcessInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$ListenerId" -ErrorAction SilentlyContinue
-    if ($null -eq $ProcessInfo -or [string]::IsNullOrWhiteSpace($ProcessInfo.CommandLine)) {
-        return $false
-    }
-    $HasPythonPath = $ProcessInfo.CommandLine.IndexOf(
-        $PythonPath,
-        [StringComparison]::OrdinalIgnoreCase
-    ) -ge 0
-    return $HasPythonPath -and $ProcessInfo.CommandLine -like '*-m app.runner*'
-}
-
 function Restore-EnvironmentValue {
     param(
         [string]$Name,
@@ -135,7 +119,7 @@ function Invoke-WithLauncherMutex {
 
 Invoke-WithLauncherMutex {
 $Readiness = Get-ReviewAssistantReadiness
-if ($Readiness -eq 'current' -or ($Readiness -eq 'legacy' -and (Test-VerifiedRunnerListener))) {
+if ($Readiness -eq 'current') {
     if (-not $NoBrowser) {
         Start-Process $Url
     }

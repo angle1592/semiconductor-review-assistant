@@ -21,6 +21,7 @@ def parse_pptx(
     blocks: list[ParsedBlock] = []
 
     for slide_number, slide in enumerate(presentation.slides, start=1):
+        slide_block_start = len(blocks)
         title_shape = slide.shapes.title
         title = title_shape.text.strip() if title_shape is not None else ""
         if title:
@@ -35,15 +36,26 @@ def parse_pptx(
             )
         heading_path = (title,) if title else ()
         for shape in slide.shapes:
-            if shape is title_shape or not getattr(shape, "has_text_frame", False):
+            if shape is title_shape:
                 continue
-            text = shape.text.strip()
+            kind = "paragraph"
+            if getattr(shape, "has_text_frame", False):
+                text = shape.text.strip()
+            elif getattr(shape, "has_table", False):
+                rows = [
+                    " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                    for row in shape.table.rows
+                ]
+                text = "\n".join(row for row in rows if row)
+                kind = "table"
+            else:
+                continue
             if not text:
                 continue
             blocks.append(
                 ParsedBlock(
                     locator=f"slide:{slide_number}:shape:{shape.shape_id}",
-                    kind="paragraph",
+                    kind=kind,
                     text=text,
                     page_number=slide_number,
                     heading_path=heading_path,
@@ -58,6 +70,16 @@ def parse_pptx(
                     text=notes,
                     page_number=slide_number,
                     heading_path=heading_path,
+                )
+            )
+        if len(blocks) == slide_block_start:
+            blocks.append(
+                ParsedBlock(
+                    locator=f"slide:{slide_number}:image",
+                    kind="image",
+                    text="本页无可提取文本，请结合页面预览分析。",
+                    page_number=slide_number,
+                    heading_path=(),
                 )
             )
 

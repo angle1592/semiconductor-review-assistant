@@ -113,6 +113,9 @@ def test_create_selected_and_all_source_runs_returns_202_and_progress(tmp_path: 
         assert body["batch_count"] == 1
         assert "后台继续" in body["message"]
 
+        with Session(app.state.database) as session:
+            assert session.get(DurableJob, body["job_id"]).max_attempts == 5
+
         progress = client.get(f"/api/analysis-runs/{body['run_id']}")
         assert progress.status_code == 200
         assert progress.json()["status"] == "queued"

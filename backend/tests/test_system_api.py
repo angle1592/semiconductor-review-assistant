@@ -64,7 +64,7 @@ def test_system_info_reports_first_run_state_without_exposing_secrets(tmp_path: 
     assert response.status_code == 200
     assert response.json() == {
         "application": "shiyao-review",
-        "version": "0.2.1-beta",
+        "version": "0.2.2-beta",
         "packaged": True,
         "setup_complete": False,
         "data_directory": str(paths.data),
