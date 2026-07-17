@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $release = Join-Path $root 'release'
-$installer = Join-Path $release 'Shiyao-0.1.0-beta-Setup.exe'
+$installer = Join-Path $release 'Shiyao-0.2.0-beta-Setup.exe'
 $guide = Join-Path $release 'Shiyao-Guide-zh-CN.pdf'
 $checksum = "$installer.sha256"
 $publish = Join-Path $release 'publish'

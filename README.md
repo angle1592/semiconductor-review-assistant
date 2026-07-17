@@ -22,8 +22,8 @@
 
 发布文件为：
 
-- `Shiyao-0.1.0-beta-Setup.exe`
-- `Shiyao-0.1.0-beta-Setup.exe.sha256`
+- `Shiyao-0.2.0-beta-Setup.exe`
+- `Shiyao-0.2.0-beta-Setup.exe.sha256`
 - `Shiyao-Guide-zh-CN.pdf`
 
 安装器使用当前用户目录，不申请管理员权限。首次启动会在本机动态端口运行，只监听 `127.0.0.1`，然后打开默认浏览器。详细步骤见 [用户指南](docs/user-guide.md)。
