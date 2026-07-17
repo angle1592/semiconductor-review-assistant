@@ -2,7 +2,7 @@
 
 ## Windows 测试版安装与使用说明
 
-版本：0.2.0-beta
+版本：0.2.1-beta
 
 系统：Windows 10 / 11 64 位
 
@@ -15,15 +15,15 @@
 把安装程序和摘要文件放在同一目录，在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash '.\Shiyao-0.2.0-beta-Setup.exe' -Algorithm SHA256
-Get-Content '.\Shiyao-0.2.0-beta-Setup.exe.sha256'
+Get-FileHash '.\Shiyao-0.2.1-beta-Setup.exe' -Algorithm SHA256
+Get-Content '.\Shiyao-0.2.1-beta-Setup.exe.sha256'
 ```
 
 两处 64 位十六进制摘要必须一致。摘要不同就不要运行安装器。本测试版尚未代码签名，SmartScreen 可能提示未知发布者；只在确认来源和摘要后继续。
 
 ## 2. 安装、启动与退出
 
-1. 双击 `Shiyao-0.2.0-beta-Setup.exe`；
+1. 双击 `Shiyao-0.2.1-beta-Setup.exe`；
 2. 保持默认的当前用户安装位置；
 3. 从桌面或开始菜单打开“拾要”；
 4. 程序会启动隐藏的本机 API 与后台任务进程，并打开默认浏览器。

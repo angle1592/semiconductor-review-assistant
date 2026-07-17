@@ -9,6 +9,17 @@ from app.providers.endpoints import ResolvedEndpoints
 from app.providers.errors import invalid_response_error, map_http_error, map_transport_error
 
 
+def _close_json_schema_objects(value: Any) -> None:
+    if isinstance(value, dict):
+        if value.get("type") == "object":
+            value.setdefault("additionalProperties", False)
+        for child in value.values():
+            _close_json_schema_objects(child)
+    elif isinstance(value, list):
+        for child in value:
+            _close_json_schema_objects(child)
+
+
 class OpenAICompatibleAdapter:
     def __init__(self, endpoints: ResolvedEndpoints, api_key: str, client: httpx.AsyncClient | None = None):
         self.endpoints = endpoints
@@ -67,6 +78,7 @@ class OpenAICompatibleAdapter:
 
     async def generate_json(self, request: StructuredRequest[Any]) -> ProviderResult[Any]:
         schema = request.output_type.model_json_schema()
+        _close_json_schema_objects(schema)
         raw, response, usage = await self._complete(request.model, request.prompt, request.system, request.images, schema, prompt_prefix=request.prompt_prefix, temperature=request.temperature)
         try:
             value = request.output_type.model_validate_json(raw)

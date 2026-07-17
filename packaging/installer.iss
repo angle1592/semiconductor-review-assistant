@@ -1,5 +1,5 @@
 #define MyAppName "拾要"
-#define MyAppVersion "0.2.0-beta"
+#define MyAppVersion "0.2.1-beta"
 #define MyAppPublisher "angle1592"
 #define MyAppExeName "Shiyao.exe"
 
@@ -17,16 +17,16 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.17763
 OutputDir=..\release
-OutputBaseFilename=Shiyao-0.2.0-beta-Setup
+OutputBaseFilename=Shiyao-0.2.1-beta-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 CloseApplications=no
 RestartApplications=no
 UninstallDisplayIcon={app}\{#MyAppExeName}
-VersionInfoVersion=0.2.0.0
+VersionInfoVersion=0.2.1.0
 VersionInfoProductName={#MyAppName}
-VersionInfoProductVersion=0.2.0.0
+VersionInfoProductVersion=0.2.1.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
