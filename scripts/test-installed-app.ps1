@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if (-not $Installer) { $Installer = Join-Path $root 'release\Shiyao-0.2.1-beta-Setup.exe' }
+if (-not $Installer) { $Installer = Join-Path $root 'release\Shiyao-0.2.2-beta-Setup.exe' }
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
 $testRoot = Join-Path $root 'build\installed-smoke'
 if (Test-Path -LiteralPath $testRoot) {

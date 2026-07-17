@@ -20,6 +20,10 @@ class NestedProbeOutput(BaseModel):
     details: ProbeDetails
 
 
+class OptionalProbeOutput(BaseModel):
+    message: str | None = None
+
+
 @pytest.mark.asyncio
 async def test_openai_lists_models_with_bearer_key():
     async def handler(request: httpx.Request):
@@ -38,6 +42,7 @@ async def test_openai_generates_structured_result_and_usage():
     async def handler(request: httpx.Request):
         payload = __import__("json").loads(request.content)
         assert payload["response_format"]["type"] == "json_schema"
+        assert request.extensions["timeout"]["read"] == 180
         return httpx.Response(200, headers={"x-request-id": "req-1"}, json={"choices": [{"message": {"content": '{"ok":true}'}}], "usage": {"prompt_tokens": 12, "completion_tokens": 3, "prompt_tokens_details": {"cached_tokens": 4}}})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -64,4 +69,19 @@ async def test_openai_marks_all_structured_output_objects_as_closed():
     adapter = OpenAICompatibleAdapter(resolve_endpoints("openai_compatible", "https://host.test"), "sk-test", client)
     result = await adapter.generate_json(StructuredRequest(model="model-a", prompt="probe", output_type=NestedProbeOutput))
     assert result.value.details.message == "ok"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_openai_requires_nullable_default_fields_in_strict_schema():
+    async def handler(request: httpx.Request):
+        payload = __import__("json").loads(request.content)
+        schema = payload["response_format"]["json_schema"]["schema"]
+        assert schema["required"] == ["message"]
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"message":null}'}}]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    adapter = OpenAICompatibleAdapter(resolve_endpoints("openai_compatible", "https://host.test"), "sk-test", client)
+    result = await adapter.generate_json(StructuredRequest(model="model-a", prompt="probe", output_type=OptionalProbeOutput))
+    assert result.value.message is None
     await client.aclose()

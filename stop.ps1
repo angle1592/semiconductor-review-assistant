@@ -16,47 +16,72 @@ if ([string]::IsNullOrWhiteSpace($RuntimeDir)) {
 if ([string]::IsNullOrWhiteSpace($PythonPath)) {
     $PythonPath = Join-Path $Backend '.venv\Scripts\python.exe'
 }
+$PythonPath = [IO.Path]::GetFullPath($PythonPath)
 $PidFile = Join-Path $RuntimeDir 'server.pid'
 $StopFile = Join-Path $RuntimeDir 'server.stop'
 $WorkerPidFile = Join-Path $RuntimeDir 'worker.pid'
 $WorkerStopFile = Join-Path $RuntimeDir 'worker.stop'
 
-function Get-VerifiedRunnerProcess {
+function Get-VerifiedPythonProcess {
     param([int]$ProcessId)
-    $ProcessInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
-    if ($null -eq $ProcessInfo -or [string]::IsNullOrWhiteSpace($ProcessInfo.CommandLine)) {
+    $ProcessInfo = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $ProcessInfo) {
         return $null
     }
-    $HasPythonPath = $ProcessInfo.CommandLine.IndexOf(
-        $PythonPath,
-        [StringComparison]::OrdinalIgnoreCase
-    ) -ge 0
-    if (-not $HasPythonPath -or $ProcessInfo.CommandLine -notlike '*-m app.runner*') {
+    try {
+        $ProcessPath = $ProcessInfo.Path
+    } catch {
+        return $null
+    }
+    if (-not [string]::Equals($ProcessPath, $PythonPath, [StringComparison]::OrdinalIgnoreCase)) {
         return $null
     }
     return $ProcessInfo
 }
 
-function Get-VerifiedWorkerProcess {
-    param([int]$ProcessId)
-    $ProcessInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
-    if ($null -eq $ProcessInfo -or [string]::IsNullOrWhiteSpace($ProcessInfo.CommandLine)) { return $null }
-    $HasPythonPath = $ProcessInfo.CommandLine.IndexOf($PythonPath, [StringComparison]::OrdinalIgnoreCase) -ge 0
-    if (-not $HasPythonPath -or $ProcessInfo.CommandLine -notlike '*-m app.jobs.worker*') { return $null }
-    return $ProcessInfo
+function Get-ReviewAssistantReadiness {
+    $WebResponse = $null
+    try {
+        $Request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$Port/ready")
+        $Request.Proxy = $null
+        $Request.Timeout = 1000
+        $Request.ReadWriteTimeout = 1000
+        $WebResponse = $Request.GetResponse()
+        $Reader = New-Object System.IO.StreamReader($WebResponse.GetResponseStream())
+        try {
+            $Response = ($Reader.ReadToEnd() | ConvertFrom-Json)
+        } finally {
+            $Reader.Dispose()
+        }
+        if (
+            $Response.status -eq 'ok' -and
+            $Response.checks.database -eq 'ok' -and
+            $Response.application -eq 'shiyao-review' -and
+            $Response.protocol_version -eq 2
+        ) {
+            return 'current'
+        }
+        return 'other'
+    } catch {
+        return 'none'
+    } finally {
+        if ($null -ne $WebResponse) {
+            $WebResponse.Dispose()
+        }
+    }
 }
 
 function Stop-RecordedWorker {
     Set-Content -LiteralPath $WorkerStopFile -Value 'stop' -Encoding Ascii
     if (-not (Test-Path -LiteralPath $WorkerPidFile)) { return }
     $WorkerId = [int](Get-Content -LiteralPath $WorkerPidFile -Raw)
-    $Worker = Get-VerifiedWorkerProcess $WorkerId
+    $Worker = Get-VerifiedPythonProcess $WorkerId
     if ($null -eq $Worker) { return }
     for ($Attempt = 0; $Attempt -lt 50; $Attempt++) {
-        if ($null -eq (Get-VerifiedWorkerProcess $WorkerId)) { return }
+        if ($null -eq (Get-VerifiedPythonProcess $WorkerId)) { return }
         Start-Sleep -Milliseconds 200
     }
-    if ($null -ne (Get-VerifiedWorkerProcess $WorkerId)) { Stop-Process -Id $WorkerId -Force -ErrorAction SilentlyContinue }
+    if ($null -ne (Get-VerifiedPythonProcess $WorkerId)) { Stop-Process -Id $WorkerId -Force -ErrorAction SilentlyContinue }
 }
 
 function Get-ListenerProcessId {
@@ -108,15 +133,17 @@ if ($null -eq $ListenerId) {
     return
 }
 
-$Listener = Get-VerifiedRunnerProcess $ListenerId
-if ($null -eq $Listener) {
+$Readiness = Get-ReviewAssistantReadiness
+if ($Readiness -ne 'current') {
     throw "端口 $Port 由其他程序占用，停止脚本不会结束它。"
 }
 
 $SafeParentId = $null
-$Parent = Get-VerifiedRunnerProcess $Listener.ParentProcessId
-if ($null -ne $Parent) {
-    $SafeParentId = [int]$Parent.ProcessId
+if (Test-Path -LiteralPath $PidFile) {
+    $RecordedId = [int](Get-Content -LiteralPath $PidFile -Raw)
+    if ($null -ne (Get-VerifiedPythonProcess $RecordedId)) {
+        $SafeParentId = $RecordedId
+    }
 }
 
 Set-Content -LiteralPath $StopFile -Value 'stop' -Encoding Ascii
@@ -130,8 +157,7 @@ for ($Attempt = 0; $Attempt -lt 40; $Attempt++) {
 
 $RemainingListenerId = Get-ListenerProcessId
 if ($null -ne $RemainingListenerId) {
-    $RemainingListener = Get-VerifiedRunnerProcess $RemainingListenerId
-    if ($null -eq $RemainingListener) {
+    if ((Get-ReviewAssistantReadiness) -ne 'current') {
         throw "端口 $Port 由其他程序占用，停止脚本不会结束它。"
     }
     Stop-Process -Id $RemainingListenerId -Force
@@ -139,12 +165,12 @@ if ($null -ne $RemainingListenerId) {
 
 if ($null -ne $SafeParentId) {
     for ($Attempt = 0; $Attempt -lt 10; $Attempt++) {
-        if ($null -eq (Get-VerifiedRunnerProcess $SafeParentId)) {
+        if ($null -eq (Get-VerifiedPythonProcess $SafeParentId)) {
             break
         }
         Start-Sleep -Milliseconds 100
     }
-    if ($null -ne (Get-VerifiedRunnerProcess $SafeParentId)) {
+    if ($null -ne (Get-VerifiedPythonProcess $SafeParentId)) {
         Stop-Process -Id $SafeParentId -Force -ErrorAction SilentlyContinue
     }
 }

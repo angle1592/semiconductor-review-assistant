@@ -47,11 +47,19 @@ def build_prompt_prefix(project_prompt: str, run_override: str) -> str:
 def _block_cost(
     block: SourceBlock,
     image_block_ids: set[str] | None = None,
-) -> tuple[int, int]:
+) -> tuple[int, str | None]:
     has_image = (
         block.id in image_block_ids if image_block_ids is not None else bool(block.asset_path)
     )
-    return len(block.text), 1 if has_image else 0
+    image_key = None
+    if has_image:
+        if block.asset_path:
+            image_key = f"{block.document_id}:asset:{block.asset_path}"
+        elif block.page_number is not None:
+            image_key = f"{block.document_id}:page:{block.page_number}"
+        else:
+            image_key = f"{block.document_id}:block:{block.id}"
+    return len(block.text), image_key
 
 
 def _sections(blocks: list[SourceBlock]) -> list[list[SourceBlock]]:
@@ -82,19 +90,23 @@ def _split_oversized_section(
 ) -> list[list[SourceBlock]]:
     chunks: list[list[SourceBlock]] = []
     current: list[SourceBlock] = []
-    characters = images = 0
+    characters = 0
+    image_keys: set[str] = set()
     for block in section:
-        block_characters, block_images = _block_cost(block, image_block_ids)
+        block_characters, block_image_key = _block_cost(block, image_block_ids)
+        next_image_keys = image_keys | ({block_image_key} if block_image_key else set())
         exceeds = current and (
-            characters + block_characters > max_characters or images + block_images > max_images
+            characters + block_characters > max_characters or len(next_image_keys) > max_images
         )
         if exceeds:
             chunks.append(current)
             current = []
-            characters = images = 0
+            characters = 0
+            image_keys = set()
+            next_image_keys = {block_image_key} if block_image_key else set()
         current.append(block)
         characters += block_characters
-        images += block_images
+        image_keys = next_image_keys
     if current:
         chunks.append(current)
     return chunks
@@ -113,8 +125,12 @@ def batch_source_blocks(
     units: list[list[SourceBlock]] = []
     for section in _sections(ordered):
         characters = sum(_block_cost(block, image_block_ids)[0] for block in section)
-        images = sum(_block_cost(block, image_block_ids)[1] for block in section)
-        if characters > max_characters or images > max_images:
+        image_keys = {
+            image_key
+            for block in section
+            if (image_key := _block_cost(block, image_block_ids)[1]) is not None
+        }
+        if characters > max_characters or len(image_keys) > max_images:
             units.extend(
                 _split_oversized_section(
                     section,
@@ -128,19 +144,27 @@ def batch_source_blocks(
 
     batches: list[list[SourceBlock]] = []
     current: list[SourceBlock] = []
-    characters = images = 0
+    characters = 0
+    image_keys: set[str] = set()
     for unit in units:
         unit_characters = sum(_block_cost(block, image_block_ids)[0] for block in unit)
-        unit_images = sum(_block_cost(block, image_block_ids)[1] for block in unit)
+        unit_image_keys = {
+            image_key
+            for block in unit
+            if (image_key := _block_cost(block, image_block_ids)[1]) is not None
+        }
+        next_image_keys = image_keys | unit_image_keys
         if current and (
-            characters + unit_characters > max_characters or images + unit_images > max_images
+            characters + unit_characters > max_characters or len(next_image_keys) > max_images
         ):
             batches.append(current)
             current = []
-            characters = images = 0
+            characters = 0
+            image_keys = set()
+            next_image_keys = unit_image_keys
         current.extend(unit)
         characters += unit_characters
-        images += unit_images
+        image_keys = next_image_keys
     if current:
         batches.append(current)
     return batches
@@ -405,7 +429,7 @@ def schedule_analysis(
         parameters=parameters,
         commit=False,
     )
-    job = enqueue_job(session, "analysis_run", {"run_id": run.id})
+    job = enqueue_job(session, "analysis_run", {"run_id": run.id}, max_attempts=5)
     session.refresh(run)
     return run, job
 
@@ -441,6 +465,6 @@ def retry_failed_batches(session: Session, run_id: int):
     run.error_detail = None
     session.add(run)
     session.flush()
-    job = enqueue_job(session, "analysis_run", {"run_id": run.id})
+    job = enqueue_job(session, "analysis_run", {"run_id": run.id}, max_attempts=5)
     session.refresh(run)
     return run, job, [batch.id for batch in failed]

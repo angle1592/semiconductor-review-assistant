@@ -1,6 +1,9 @@
 from pathlib import Path
 
 import pytest
+from PIL import Image
+from pptx import Presentation
+from pptx.util import Inches
 
 from app.sources.parsers.docx import parse_docx
 from app.sources.parsers.office import (
@@ -48,6 +51,28 @@ def test_pptx_parser_preserves_slide_order_and_speaker_notes(tmp_path: Path):
     assert parsed.blocks[0].locator.startswith("slide:1")
     assert any("PPTX 预览不可用" in warning for warning in parsed.warnings)
     assert parsed.render_paths == ()
+
+
+def test_pptx_parser_indexes_tables_and_image_only_slides(tmp_path: Path):
+    source = tmp_path / "coverage.pptx"
+    image = tmp_path / "pixel.png"
+    Image.new("RGB", (2, 2), "white").save(image)
+    presentation = Presentation()
+    table_slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    table = table_slide.shapes.add_table(1, 2, Inches(1), Inches(1), Inches(4), Inches(1)).table
+    table.cell(0, 0).text = "参数"
+    table.cell(0, 1).text = "数值"
+    image_slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    image_slide.shapes.add_picture(str(image), Inches(1), Inches(1))
+    presentation.save(source)
+
+    parsed = parse_pptx(source, tmp_path / "assets", renderer=lambda _source, _output: ())
+
+    assert parsed.page_count == 2
+    assert parsed.blocks[0].kind == "table"
+    assert parsed.blocks[0].text == "参数 | 数值"
+    assert parsed.blocks[1].kind == "image"
+    assert parsed.blocks[1].page_number == 2
 
 
 def test_powerpoint_renderer_collects_localized_export_names(tmp_path: Path):

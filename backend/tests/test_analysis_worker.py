@@ -23,6 +23,7 @@ from app.providers.endpoints import resolve_endpoints
 from app.providers.models import AIProviderProfile, ModelProfile
 from app.jobs.models import DurableJob
 from app.jobs.worker import DurableWorker
+from app.keypoints.models import KeyPointCandidate as KeyPointCandidateRecord
 from app.projects.models import ReviewProject
 from app.shared.database import create_database
 from app.shared.errors import AppError
@@ -37,6 +38,7 @@ def make_block(
     kind: str,
     text: str,
     asset_path: str | None = None,
+    page_number: int | None = None,
 ) -> SourceBlock:
     return SourceBlock(
         id=block_id,
@@ -46,6 +48,7 @@ def make_block(
         kind=kind,
         text=text,
         asset_path=asset_path,
+        page_number=page_number,
     )
 
 
@@ -62,6 +65,31 @@ def test_deterministic_batching_keeps_heading_with_following_content():
     assert [[block.id for block in batch] for batch in batches] == [
         ["h1", "p1", "p3"],
         ["p2"],
+    ]
+
+
+def test_batching_counts_one_preview_image_per_page():
+    blocks = [
+        make_block("h1", document_id=1, ordinal=0, kind="heading", text="第一页", page_number=1),
+        make_block(
+            "p1", document_id=1, ordinal=1, kind="paragraph", text="第一页说明", page_number=1
+        ),
+        make_block(
+            "p2", document_id=1, ordinal=2, kind="paragraph", text="第一页补充", page_number=1
+        ),
+        make_block("h2", document_id=1, ordinal=3, kind="heading", text="第二页", page_number=2),
+    ]
+
+    batches = batch_source_blocks(
+        blocks,
+        max_characters=100,
+        max_images=1,
+        image_block_ids={block.id for block in blocks},
+    )
+
+    assert [[block.id for block in batch] for batch in batches] == [
+        ["h1", "p1", "p2"],
+        ["h2"],
     ]
 
 
@@ -166,6 +194,18 @@ class FakeAnalysisAdapter:
 class FailingAnalysisAdapter:
     async def generate_json(self, _request: StructuredRequest):
         raise RuntimeError("provider failed")
+
+
+class SucceedOnceThenFailAnalysisAdapter:
+    def __init__(self):
+        self.attempts = 0
+        self.success_adapter = FakeAnalysisAdapter([])
+
+    async def generate_json(self, request: StructuredRequest):
+        self.attempts += 1
+        if "BLOCK_ID: heading-a" in request.prompt:
+            return await self.success_adapter.generate_json(request)
+        raise RuntimeError("provider failed after one successful batch")
 
 
 def seed_analysis_data(engine):
@@ -373,6 +413,8 @@ def test_terminal_worker_failure_marks_run_and_batch_failed_without_cache(tmp_pa
     assert worker.run_once(now=now)
     assert worker.run_once(now=now + timedelta(seconds=1))
     assert worker.run_once(now=now + timedelta(seconds=3))
+    assert worker.run_once(now=now + timedelta(seconds=7))
+    assert worker.run_once(now=now + timedelta(seconds=15))
 
     with Session(engine) as session:
         stored_run = session.get(AnalysisRun, run_id)
@@ -382,6 +424,74 @@ def test_terminal_worker_failure_marks_run_and_batch_failed_without_cache(tmp_pa
     assert stored_run.status == "failed"
     assert batch.status == "failed"
     assert list((tmp_path / "Runtime" / "ai-cache").glob("[0-9a-f][0-9a-f]/*.json")) == []
+
+
+def test_terminal_partial_failure_materializes_successful_batch_results(tmp_path: Path):
+    engine = create_database(tmp_path / "data")
+    project_id, provider_id, model_profile_id, block_ids = seed_analysis_data(engine)
+    with Session(engine) as session:
+        document_id = session.get(SourceBlock, "heading-a").document_id
+        extra_blocks = [
+            make_block(
+                "heading-b", document_id=document_id, ordinal=2, kind="heading", text="第二章"
+            ),
+            make_block(
+                "paragraph-b",
+                document_id=document_id,
+                ordinal=3,
+                kind="paragraph",
+                text="失败内容",
+            ),
+        ]
+        session.add_all(extra_blocks)
+        session.commit()
+        block_ids.extend(block.id for block in extra_blocks)
+
+    secrets = MemorySecretStore()
+    secrets.set(credential_key(provider_id), "private-key")
+    with Session(engine) as session:
+        run, job = schedule_analysis(
+            session,
+            project_id=project_id,
+            selected_block_ids=block_ids,
+            provider_id=provider_id,
+            model_profile_id=model_profile_id,
+            run_override="",
+            parameters={"temperature": 0},
+            max_characters=7,
+        )
+        run_id, job_id = run.id, job.id
+        now = job.available_at.replace(tzinfo=UTC) + timedelta(seconds=1)
+
+    adapter = SucceedOnceThenFailAnalysisAdapter()
+    handler = AnalysisWorkerHandler(
+        engine,
+        tmp_path / "Runtime",
+        secrets,
+        lambda _profile, _api_key: adapter,
+    )
+    worker = DurableWorker(
+        engine,
+        {"analysis_run": handler},
+        worker_id="worker-test",
+        retry_base_seconds=1,
+    )
+    assert worker.run_once(now=now)
+    assert worker.run_once(now=now + timedelta(seconds=1))
+    assert worker.run_once(now=now + timedelta(seconds=3))
+    assert worker.run_once(now=now + timedelta(seconds=7))
+    assert worker.run_once(now=now + timedelta(seconds=15))
+
+    with Session(engine) as session:
+        stored_run = session.get(AnalysisRun, run_id)
+        stored_job = session.get(DurableJob, job_id)
+        candidates = session.exec(
+            select(KeyPointCandidateRecord).where(KeyPointCandidateRecord.run_id == run_id)
+        ).all()
+
+    assert stored_job.status == "failed"
+    assert stored_run.status == "partial"
+    assert [candidate.title for candidate in candidates] == ["第一章公式"]
 
 
 def test_cancelled_analysis_marks_the_durable_job_cancelled(tmp_path: Path):

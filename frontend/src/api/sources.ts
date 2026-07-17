@@ -45,7 +45,17 @@ export const sourceKeys = {
 
 export const sourcesApi = {
   list: (projectId: string) => request<Paged<SourceDocument>>(`/api/projects/${projectId}/sources`),
-  blocks: (sourceId: number) => request<Paged<SourceBlock>>(`/api/sources/${sourceId}/blocks`),
+  blocks: async (sourceId: number) => {
+    const pageSize = 100
+    const first = await request<Paged<SourceBlock>>(`/api/sources/${sourceId}/blocks?offset=0&limit=${pageSize}`)
+    const items = [...first.items]
+    while (items.length < first.total) {
+      const next = await request<Paged<SourceBlock>>(`/api/sources/${sourceId}/blocks?offset=${items.length}&limit=${pageSize}`)
+      if (!next.items.length) break
+      items.push(...next.items)
+    }
+    return { ...first, items, offset: 0 }
+  },
   upload: (projectId: string, file: File, sourceKind: SourceDocument['source_kind'] = 'mixed') => {
     const form = new FormData()
     form.append('file', file)

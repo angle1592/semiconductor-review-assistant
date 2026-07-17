@@ -9,15 +9,18 @@ from app.providers.endpoints import ResolvedEndpoints
 from app.providers.errors import invalid_response_error, map_http_error, map_transport_error
 
 
-def _close_json_schema_objects(value: Any) -> None:
+def _normalize_strict_json_schema(value: Any) -> None:
     if isinstance(value, dict):
         if value.get("type") == "object":
             value.setdefault("additionalProperties", False)
+            properties = value.get("properties")
+            if isinstance(properties, dict):
+                value["required"] = list(properties)
         for child in value.values():
-            _close_json_schema_objects(child)
+            _normalize_strict_json_schema(child)
     elif isinstance(value, list):
         for child in value:
-            _close_json_schema_objects(child)
+            _normalize_strict_json_schema(child)
 
 
 class OpenAICompatibleAdapter:
@@ -30,9 +33,9 @@ class OpenAICompatibleAdapter:
     def headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"}
 
-    async def _send(self, url: str, *, method: str = "POST", payload: dict | None = None) -> httpx.Response:
+    async def _send(self, url: str, *, method: str = "POST", payload: dict | None = None, timeout: float = 60) -> httpx.Response:
         try:
-            response = await self.client.request(method, url, headers=self.headers, json=payload, timeout=60)
+            response = await self.client.request(method, url, headers=self.headers, json=payload, timeout=timeout)
         except httpx.HTTPError as error:
             raise map_transport_error(error) from error
         if not response.is_success:
@@ -60,7 +63,7 @@ class OpenAICompatibleAdapter:
         payload: dict[str, Any] = {"model": model, "messages": messages, "temperature": temperature}
         if schema is not None:
             payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "shiyao_result", "strict": True, "schema": schema}}
-        response = await self._send(self.endpoints.inference_url, payload=payload)
+        response = await self._send(self.endpoints.inference_url, payload=payload, timeout=180)
         try:
             body = response.json()
             return body["choices"][0]["message"]["content"], response, body.get("usage", {})
@@ -78,7 +81,7 @@ class OpenAICompatibleAdapter:
 
     async def generate_json(self, request: StructuredRequest[Any]) -> ProviderResult[Any]:
         schema = request.output_type.model_json_schema()
-        _close_json_schema_objects(schema)
+        _normalize_strict_json_schema(schema)
         raw, response, usage = await self._complete(request.model, request.prompt, request.system, request.images, schema, prompt_prefix=request.prompt_prefix, temperature=request.temperature)
         try:
             value = request.output_type.model_validate_json(raw)

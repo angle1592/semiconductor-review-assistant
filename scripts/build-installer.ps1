@@ -26,6 +26,6 @@ $IsccPath = (Resolve-Path -LiteralPath $IsccPath).Path
 & $IsccPath (Join-Path $root 'packaging\installer.iss')
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup 构建失败，退出码：$LASTEXITCODE" }
 
-$installer = Join-Path $root 'release\Shiyao-0.2.1-beta-Setup.exe'
+$installer = Join-Path $root 'release\Shiyao-0.2.2-beta-Setup.exe'
 if (-not (Test-Path -LiteralPath $installer)) { throw '安装器未生成。' }
 Write-Host "安装器已生成：$installer"
